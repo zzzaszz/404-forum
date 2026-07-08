@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="zzz.service.forum.mapper.UsertokenMapper">
+
+    <!--查询单个-->
+    <select id="getEntity" resultType="zzz.service.forum.domain.pojo.UsertokenPojo">
+        select Id,
+               UserId,
+               AccessToken,
+               RefreshToken,
+               ExpireAt,
+               DeviceId,
+               Ip,
+               Status,
+               CreatedAt
+        from UserToken
+        where UserToken.Id = #{key}
+    </select>
+    <sql id="selectUsertokenVo">
+        select Id,
+               UserId,
+               AccessToken,
+               RefreshToken,
+               ExpireAt,
+               DeviceId,
+               Ip,
+               Status,
+               CreatedAt
+        from UserToken
+    </sql>
+
+    <!--查询指定行数据-->
+    <select id="getPageList" parameterType="zzz.service.forum.domain.dto.QueryParam"
+            resultType="zzz.service.forum.domain.pojo.UsertokenPojo">
+        <include refid="selectUsertokenVo"/>
+        where 1 = 1
+        <if test="filterstr != null ">
+            ${filterstr}
+        </if>
+        <if test="DateRange != null ">
+            <if test="DateRange.DateColumn ==null or DateRange.DateColumn == ''">
+                and UserToken.CreatedAt BETWEEN #{DateRange.StartDate} and #{DateRange.EndDate}
+            </if>
+            <if test="DateRange.DateColumn !=null and DateRange.DateColumn != ''">
+                and #{DateRange.DateColumn} BETWEEN #{DateRange.StartDate} and #{DateRange.EndDate}
+            </if>
+        </if>
+        <if test="SearchPojo != null ">
+            <if test="SearchType==0">
+                <include refid="and"></include>
+            </if>
+            <if test="SearchType==1">
+                <include refid="or"></include>
+            </if>
+        </if>
+        order by ${orderBy}
+        <if test="OrderType==0">asc</if>
+        <if test="OrderType==1">desc</if>
+    </select>
+    <sql id="and">
+        <if test="SearchPojo.accesstoken != null ">
+            and UserToken.AccessToken like concat('%', #{SearchPojo.accesstoken}, '%')
+        </if>
+        <if test="SearchPojo.refreshtoken != null ">
+            and UserToken.RefreshToken like concat('%', #{SearchPojo.refreshtoken}, '%')
+        </if>
+        <if test="SearchPojo.deviceid != null ">
+            and UserToken.DeviceId like concat('%', #{SearchPojo.deviceid}, '%')
+        </if>
+        <if test="SearchPojo.ip != null ">
+            and UserToken.Ip like concat('%', #{SearchPojo.ip}, '%')
+        </if>
+    </sql>
+    <sql id="or">
+        <trim prefix=" AND (" suffix=")" prefixOverrides="AND |OR ">
+            <if test="SearchPojo.accesstoken != null ">
+                or UserToken.AccessToken like concat('%', #{SearchPojo.accesstoken}, '%')
+            </if>
+            <if test="SearchPojo.refreshtoken != null ">
+                or UserToken.RefreshToken like concat('%', #{SearchPojo.refreshtoken}, '%')
+            </if>
+            <if test="SearchPojo.deviceid != null ">
+                or UserToken.DeviceId like concat('%', #{SearchPojo.deviceid}, '%')
+            </if>
+            <if test="SearchPojo.ip != null ">
+                or UserToken.Ip like concat('%', #{SearchPojo.ip}, '%')
+            </if>
+        </trim>
+    </sql>
+    <!--新增所有列-->
+    <insert id="insert">
+        insert into UserToken(Id, UserId, AccessToken, RefreshToken, ExpireAt, DeviceId, Ip, Status, CreatedAt)
+        values (#{id}, #{userid}, #{accesstoken}, #{refreshtoken}, #{expireat}, #{deviceid}, #{ip}, #{status},
+                #{createdat})
+    </insert>
+
+    <!--通过主键修改数据-->
+    <update id="update">
+        update UserToken
+        <set>
+            <if test="userid != null">
+                UserId =#{userid},
+            </if>
+            <if test="accesstoken != null ">
+                AccessToken =#{accesstoken},
+            </if>
+            <if test="refreshtoken != null ">
+                RefreshToken =#{refreshtoken},
+            </if>
+            <if test="expireat != null">
+                ExpireAt =#{expireat},
+            </if>
+            <if test="deviceid != null ">
+                DeviceId =#{deviceid},
+            </if>
+            <if test="ip != null ">
+                Ip =#{ip},
+            </if>
+            <if test="status != null">
+                Status =#{status},
+            </if>
+            <if test="createdat != null">
+                CreatedAt =#{createdat},
+            </if>
+        </set>
+        where Id = #{id}
+    </update>
+
+    <!--通过主键删除-->
+    <delete id="delete">
+        delete
+        from UserToken
+        where Id = #{key}
+    </delete>
+</mapper>
+

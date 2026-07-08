@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="zzz.service.forum.mapper.CommentMapper">
+
+    <!--查询单个-->
+    <select id="getEntity" resultType="zzz.service.forum.domain.pojo.CommentPojo">
+        select Id, PostId, UserId, RootId, ParentId, ReplyUserId, AnonymousIdentityId, AnonymousName,
+               Content, LikeCount, ReplyCount, Status, CreatedAt
+        from Comment
+        where Comment.Id = #{key}
+    </select>
+    <sql id="selectCommentVo">
+        select Id, PostId, UserId, RootId, ParentId, ReplyUserId, AnonymousIdentityId, AnonymousName,
+               Content, LikeCount, ReplyCount, Status, CreatedAt
+        from Comment
+    </sql>
+
+    <!--查询指定行数据-->
+    <select id="getPageList" parameterType="zzz.service.forum.domain.dto.QueryParam"
+            resultType="zzz.service.forum.domain.pojo.CommentPojo">
+        <include refid="selectCommentVo"/>
+        where 1 = 1 and Comment.Tenantid =#{tenantid}
+        <if test="filterstr != null ">
+            ${filterstr}
+        </if>
+        <if test="DateRange != null ">
+            <if test="DateRange.DateColumn ==null or DateRange.DateColumn == ''">
+                and Comment.CreatedAt BETWEEN #{DateRange.StartDate} and #{DateRange.EndDate}
+            </if>
+            <if test="DateRange.DateColumn !=null and DateRange.DateColumn != ''">
+                and #{DateRange.DateColumn} BETWEEN #{DateRange.StartDate} and #{DateRange.EndDate}
+            </if>
+        </if>
+        <if test="SearchPojo != null ">
+            <if test="SearchType==0">
+                <include refid="and"></include>
+            </if>
+            <if test="SearchType==1">
+                <include refid="or"></include>
+            </if>
+        </if>
+        order by ${orderBy}
+        <if test="OrderType==0">asc</if>
+        <if test="OrderType==1">desc</if>
+    </select>
+    <sql id="and">
+        <if test="SearchPojo.anonymousname != null ">
+            and Comment.AnonymousName like concat('%', #{SearchPojo.anonymousname}, '%')
+        </if>
+        <if test="SearchPojo.content != null ">
+            and Comment.Content like concat('%', #{SearchPojo.content}, '%')
+        </if>
+    </sql>
+    <sql id="or">
+        <trim prefix=" AND (" suffix=")" prefixOverrides="AND |OR ">
+            <if test="SearchPojo.anonymousname != null ">
+                or Comment.AnonymousName like concat('%', #{SearchPojo.anonymousname}, '%')
+            </if>
+            <if test="SearchPojo.content != null ">
+                or Comment.Content like concat('%', #{SearchPojo.content}, '%')
+            </if>
+        </trim>
+    </sql>
+    <!--新增所有列-->
+    <insert id="insert">
+        insert into Comment(Id, PostId, UserId, RootId, ParentId, ReplyUserId, AnonymousIdentityId, AnonymousName,
+                            Content, LikeCount, ReplyCount, Status, CreatedAt)
+        values (#{id}, #{postid}, #{userid}, #{rootid}, #{parentid}, #{replyuserid}, #{anonymousidentityid},
+                #{anonymousname}, #{content}, #{likecount}, #{replycount}, #{status}, #{createdat})
+    </insert>
+
+    <!--通过主键修改数据-->
+    <update id="update">
+        update Comment
+        <set>
+            <if test="postid != null">
+                PostId =#{postid},
+            </if>
+            <if test="userid != null">
+                UserId =#{userid},
+            </if>
+            <if test="rootid != null">
+                RootId =#{rootid},
+            </if>
+            <if test="parentid != null">
+                ParentId =#{parentid},
+            </if>
+            <if test="replyuserid != null">
+                ReplyUserId =#{replyuserid},
+            </if>
+            <if test="anonymousidentityid != null">
+                AnonymousIdentityId =#{anonymousidentityid},
+            </if>
+            <if test="anonymousname != null ">
+                AnonymousName =#{anonymousname},
+            </if>
+            <if test="content != null ">
+                Content =#{content},
+            </if>
+            <if test="likecount != null">
+                LikeCount =#{likecount},
+            </if>
+            <if test="replycount != null">
+                ReplyCount =#{replycount},
+            </if>
+            <if test="status != null">
+                Status =#{status},
+            </if>
+            <if test="createdat != null">
+                CreatedAt =#{createdat},
+            </if>
+        </set>
+        where Id = #{id} and Tenantid =#{tenantid}
+    </update>
+
+    <!--通过主键删除-->
+    <delete id="delete">
+        delete
+        from Comment
+        where Id = #{key}
+    </delete>
+</mapper>
+

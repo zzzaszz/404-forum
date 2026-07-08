@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="zzz.service.forum.mapper.ForumMapper">
+
+    <!-- 话题列表字段（含板块名/编码） -->
+    <sql id="topicColumns">
+        Post.Id,
+        Post.BoardId,
+        Post.UserId,
+        Post.AnonymousIdentityId,
+        Post.AnonymousName,
+        Post.AnonymousAvatar,
+        Post.AnonymousColor,
+        Post.Title,
+        Post.Content,
+        Post.ContentText,
+        Post.Images,
+        Post.ViewCount,
+        Post.ReplyCount,
+        Post.LikeCount,
+        Post.FavoriteCount,
+        Post.ShareCount,
+        Post.ReportCount,
+        Post.HotScore,
+        Post.IsTop,
+        Post.IsEssence,
+        Post.Status,
+        Post.IpHash,
+        Post.DeviceHash,
+        Post.CreatedAt,
+        Post.UpdatedAt,
+        Post.Deleted,
+        Board.Name        as boardname,
+        Board.Code        as boardcode
+    </sql>
+
+    <!-- 话题列表 -->
+    <select id="findTopicList" resultType="zzz.service.forum.domain.pojo.PostPojo">
+        select
+        <include refid="topicColumns"/>
+        from Post
+        left join Board on Board.Id = Post.BoardId
+        where Post.Deleted = 0 and Post.Status = 1
+        <if test="boardCode != null and boardCode != ''">
+            and Board.Code = #{boardCode}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (Post.Title like concat('%', #{keyword}, '%')
+            or Post.ContentText like concat('%', #{keyword}, '%'))
+        </if>
+        order by ${orderSql}
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <!-- 话题总数 -->
+    <select id="countTopicList" resultType="long">
+        select count(1)
+        from Post
+        left join Board on Board.Id = Post.BoardId
+        where Post.Deleted = 0 and Post.Status = 1
+        <if test="boardCode != null and boardCode != ''">
+            and Board.Code = #{boardCode}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (Post.Title like concat('%', #{keyword}, '%')
+            or Post.ContentText like concat('%', #{keyword}, '%'))
+        </if>
+    </select>
+
+    <!-- 热门话题榜 -->
+    <select id="findHotTopics" resultType="zzz.service.forum.domain.pojo.PostPojo">
+        select
+        <include refid="topicColumns"/>
+        from Post
+        left join Board on Board.Id = Post.BoardId
+        where Post.Deleted = 0 and Post.Status = 1
+        order by Post.HotScore desc, Post.CreatedAt desc
+        limit #{limit}
+    </select>
+
+    <!-- 话题详情 -->
+    <select id="findTopicDetail" resultType="zzz.service.forum.domain.pojo.PostPojo">
+        select
+        <include refid="topicColumns"/>
+        from Post
+        left join Board on Board.Id = Post.BoardId
+        where Post.Id = #{id} and Post.Deleted = 0
+    </select>
+
+    <!-- 浏览量 +1 -->
+    <update id="incrViewCount">
+        update Post
+        set ViewCount = ViewCount + 1
+        where Id = #{id}
+    </update>
+
+    <!-- 帖子评论列表 -->
+    <select id="findCommentsByPostId" resultType="zzz.service.forum.domain.pojo.CommentPojo">
+        select Id,
+               PostId,
+               UserId,
+               RootId,
+               ParentId,
+               ReplyUserId,
+               AnonymousIdentityId,
+               AnonymousName,
+               Content,
+               LikeCount,
+               ReplyCount,
+               Status,
+               CreatedAt
+        from Comment
+        where PostId = #{postId}
+          and Status = 1
+        order by CreatedAt asc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <!-- 帖子评论总数 -->
+    <select id="countComments" resultType="long">
+        select count(1)
+        from Comment
+        where PostId = #{postId}
+          and Status = 1
+    </select>
+
+    <!-- 新增帖子 -->
+    <insert id="insertPost" parameterType="zzz.service.forum.domain.pojo.PostPojo">
+        insert into Post(Id, BoardId, UserId, AnonymousIdentityId, AnonymousName, AnonymousAvatar, AnonymousColor,
+                         Title, Content, ContentText, Images, ViewCount, ReplyCount, LikeCount, FavoriteCount,
+                         ShareCount, ReportCount, HotScore, IsTop, IsEssence, Status, IpHash, DeviceHash, CreatedAt,
+                         UpdatedAt, Deleted)
+        values (#{id}, #{boardid}, #{userid}, #{anonymousidentityid}, #{anonymousname}, #{anonymousavatar},
+                #{anonymouscolor}, #{title}, #{content}, #{contenttext}, #{images},
+                #{viewcount}, #{replycount}, #{likecount}, #{favoritecount},
+                #{sharecount}, #{reportcount}, #{hotscore}, #{istop}, #{isessence},
+                #{status}, #{iphash}, #{devicehash}, #{createdat}, #{updatedat}, #{deleted})
+    </insert>
+
+    <!-- 新增评论 -->
+    <insert id="insertComment" parameterType="zzz.service.forum.domain.pojo.CommentPojo">
+        insert into Comment(Id, PostId, UserId, RootId, ParentId, ReplyUserId, AnonymousIdentityId, AnonymousName,
+                            Content, LikeCount, ReplyCount, Status, CreatedAt)
+        values (#{id}, #{postid}, #{userid}, #{rootid}, #{parentid}, #{replyuserid},
+                #{anonymousidentityid}, #{anonymousname}, #{content}, #{likecount}, #{replycount}, #{status},
+                #{createdat})
+    </insert>
+
+    <!-- 帖子评论数 +1 -->
+    <update id="incrPostReplyCount">
+        update Post
+        set ReplyCount = ReplyCount + 1
+        where Id = #{id}
+    </update>
+
+    <!-- 帖子点赞数 ±delta -->
+    <update id="incrPostLikeCount">
+        update Post
+        set LikeCount = LikeCount + #{delta}
+        where Id = #{id}
+    </update>
+
+    <!-- 评论点赞数 ±delta -->
+    <update id="incrCommentLikeCount">
+        update Comment
+        set LikeCount = LikeCount + #{delta}
+        where Id = #{id}
+    </update>
+
+    <!-- 帖子收藏数 ±delta -->
+    <update id="incrPostFavoriteCount">
+        update Post
+        set FavoriteCount = FavoriteCount + #{delta}
+        where Id = #{id}
+    </update>
+
+    <!-- 帖子举报数 +1 -->
+    <update id="incrPostReportCount">
+        update Post
+        set ReportCount = ReportCount + 1
+        where Id = #{id}
+    </update>
+
+    <!-- 板块帖子数 ±delta -->
+    <update id="incrBoardPostCount">
+        update Board
+        set PostCount = PostCount + #{delta}
+        where Id = #{boardId}
+    </update>
+
+    <!-- 启用板块列表 -->
+    <select id="findActiveBoards" resultType="zzz.service.forum.domain.pojo.BoardPojo">
+        select Id,
+               Name,
+               Code,
+               Icon,
+               Description,
+               SortOrder,
+               PostCount,
+               FollowCount,
+               Status,
+               CreatedAt,
+               UpdatedAt
+        from Board
+        where Status = 1
+        order by SortOrder desc, Id asc
+    </select>
+
+    <!-- 按 Code 查板块 -->
+    <select id="findBoardByCode" resultType="zzz.service.forum.domain.pojo.BoardPojo">
+        select Id,
+               Name,
+               Code,
+               Icon,
+               Description,
+               SortOrder,
+               PostCount,
+               FollowCount,
+               Status,
+               CreatedAt,
+               UpdatedAt
+        from Board
+        where Code = #{code}
+    </select>
+
+    <!-- 用户通知列表 -->
+    <select id="findNotifications" resultType="zzz.service.forum.domain.pojo.NotificationPojo">
+        select Id,
+               UserId,
+               Type,
+               SourceUserId,
+               TargetId,
+               Content,
+               IsRead,
+               CreatedAt
+        from Notification
+        where UserId = #{userId}
+        order by CreatedAt desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <!-- 未读通知数 -->
+    <select id="countUnreadNotifications" resultType="long">
+        select count(1)
+        from Notification
+        where UserId = #{userId}
+          and IsRead = 0
+    </select>
+
+    <!-- 新增通知 -->
+    <insert id="insertNotification" parameterType="zzz.service.forum.domain.pojo.NotificationPojo">
+        insert into Notification(Id, UserId, Type, SourceUserId, TargetId, Content, IsRead, CreatedAt)
+        values (#{id}, #{userid}, #{type}, #{sourceuserid}, #{targetid}, #{content}, #{isread}, #{createdat})
+    </insert>
+
+    <!-- 总帖子数 -->
+    <select id="countAllPosts" resultType="long">
+        select count(1)
+        from Post
+        where Deleted = 0
+          and Status = 1
+    </select>
+
+    <!-- 总评论数 -->
+    <select id="countAllComments" resultType="long">
+        select count(1)
+        from Comment
+        where Status = 1
+    </select>
+
+    <!-- 总用户数 -->
+    <select id="countAllUsers" resultType="long">
+        select count(1)
+        from User
+        where Deleted = 0
+    </select>
+
+    <!-- 近 7 天活跃帖子数 -->
+    <select id="countRecentActivePosts" resultType="long">
+        select count(1)
+        from Post
+        where Deleted = 0
+          and Status = 1
+          and CreatedAt >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    </select>
+
+    <!-- 最近活跃用户（在线占位） -->
+    <select id="findRecentUsers" resultType="java.util.Map">
+        select Id as id, Nickname as nickname
+        from User
+        where Deleted = 0
+          and Status = 1
+        order by LastLoginAt desc, CreatedAt desc
+        limit #{limit}
+    </select>
+
+    <!-- 查询点赞记录主键 -->
+    <select id="findLikeId" resultType="java.lang.Long">
+        select Id
+        from LikeRecord
+        where UserId = #{userId}
+          and TargetType = #{targetType}
+          and TargetId = #{targetId}
+        limit 1
+    </select>
+
+    <!-- 删除点赞记录 -->
+    <delete id="deleteLike">
+        delete
+        from LikeRecord
+        where UserId = #{userId}
+          and TargetType = #{targetType}
+          and TargetId = #{targetId}
+    </delete>
+
+    <!-- 查询收藏记录主键 -->
+    <select id="findFavoriteId" resultType="java.lang.Long">
+        select Id
+        from FavoriteRecord
+        where UserId = #{userId}
+          and PostId = #{postId}
+        limit 1
+    </select>
+
+    <!-- 删除收藏记录 -->
+    <delete id="deleteFavorite">
+        delete
+        from FavoriteRecord
+        where UserId = #{userId}
+          and PostId = #{postId}
+    </delete>
+
+</mapper>

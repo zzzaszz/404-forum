@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="zzz.service.forum.mapper.PostMapper">
+
+    <!--查询单个-->
+    <select id="getEntity" resultType="zzz.service.forum.domain.pojo.PostPojo">
+        select Id,
+               BoardId,
+               UserId,
+               AnonymousIdentityId,
+               AnonymousName,
+               AnonymousAvatar,
+               AnonymousColor,
+               Title,
+               Content,
+               ContentText,
+               Images,
+               ViewCount,
+               ReplyCount,
+               LikeCount,
+               FavoriteCount,
+               ShareCount,
+               ReportCount,
+               HotScore,
+               IsTop,
+               IsEssence,
+               Status,
+               IpHash,
+               DeviceHash,
+               CreatedAt,
+               UpdatedAt,
+               Deleted
+        from Post
+        where Post.Id = #{key}
+    </select>
+    <sql id="selectPostVo">
+        select Id,
+               BoardId,
+               UserId,
+               AnonymousIdentityId,
+               AnonymousName,
+               AnonymousAvatar,
+               AnonymousColor,
+               Title,
+               Content,
+               ContentText,
+               Images,
+               ViewCount,
+               ReplyCount,
+               LikeCount,
+               FavoriteCount,
+               ShareCount,
+               ReportCount,
+               HotScore,
+               IsTop,
+               IsEssence,
+               Status,
+               IpHash,
+               DeviceHash,
+               CreatedAt,
+               UpdatedAt,
+               Deleted
+        from Post
+    </sql>
+
+    <!--查询指定行数据-->
+    <select id="getPageList" parameterType="zzz.service.forum.domain.dto.QueryParam"
+            resultType="zzz.service.forum.domain.pojo.PostPojo">
+        <include refid="selectPostVo"/>
+        where 1 = 1
+        <if test="filterstr != null ">
+            ${filterstr}
+        </if>
+        <if test="DateRange != null ">
+            <if test="DateRange.DateColumn ==null or DateRange.DateColumn == ''">
+                and Post.CreatedAt BETWEEN #{DateRange.StartDate} and #{DateRange.EndDate}
+            </if>
+            <if test="DateRange.DateColumn !=null and DateRange.DateColumn != ''">
+                and #{DateRange.DateColumn} BETWEEN #{DateRange.StartDate} and #{DateRange.EndDate}
+            </if>
+        </if>
+        <if test="SearchPojo != null ">
+            <if test="SearchType==0">
+                <include refid="and"></include>
+            </if>
+            <if test="SearchType==1">
+                <include refid="or"></include>
+            </if>
+        </if>
+        order by ${orderBy}
+        <if test="OrderType==0">asc</if>
+        <if test="OrderType==1">desc</if>
+    </select>
+    <sql id="and">
+        <if test="SearchPojo.anonymousname != null ">
+            and Post.AnonymousName like concat('%', #{SearchPojo.anonymousname}, '%')
+        </if>
+        <if test="SearchPojo.anonymousavatar != null ">
+            and Post.AnonymousAvatar like concat('%', #{SearchPojo.anonymousavatar}, '%')
+        </if>
+        <if test="SearchPojo.anonymouscolor != null ">
+            and Post.AnonymousColor like concat('%', #{SearchPojo.anonymouscolor}, '%')
+        </if>
+        <if test="SearchPojo.title != null ">
+            and Post.Title like concat('%', #{SearchPojo.title}, '%')
+        </if>
+        <if test="SearchPojo.content != null ">
+            and Post.Content like concat('%', #{SearchPojo.content}, '%')
+        </if>
+        <if test="SearchPojo.contenttext != null ">
+            and Post.ContentText like concat('%', #{SearchPojo.contenttext}, '%')
+        </if>
+        <if test="SearchPojo.images != null ">
+            and Post.Images like concat('%', #{SearchPojo.images}, '%')
+        </if>
+        <if test="SearchPojo.iphash != null ">
+            and Post.IpHash like concat('%', #{SearchPojo.iphash}, '%')
+        </if>
+        <if test="SearchPojo.devicehash != null ">
+            and Post.DeviceHash like concat('%', #{SearchPojo.devicehash}, '%')
+        </if>
+    </sql>
+    <sql id="or">
+        <trim prefix=" AND (" suffix=")" prefixOverrides="AND |OR ">
+            <if test="SearchPojo.anonymousname != null ">
+                or Post.AnonymousName like concat('%', #{SearchPojo.anonymousname}, '%')
+            </if>
+            <if test="SearchPojo.anonymousavatar != null ">
+                or Post.AnonymousAvatar like concat('%', #{SearchPojo.anonymousavatar}, '%')
+            </if>
+            <if test="SearchPojo.anonymouscolor != null ">
+                or Post.AnonymousColor like concat('%', #{SearchPojo.anonymouscolor}, '%')
+            </if>
+            <if test="SearchPojo.title != null ">
+                or Post.Title like concat('%', #{SearchPojo.title}, '%')
+            </if>
+            <if test="SearchPojo.content != null ">
+                or Post.Content like concat('%', #{SearchPojo.content}, '%')
+            </if>
+            <if test="SearchPojo.contenttext != null ">
+                or Post.ContentText like concat('%', #{SearchPojo.contenttext}, '%')
+            </if>
+            <if test="SearchPojo.images != null ">
+                or Post.Images like concat('%', #{SearchPojo.images}, '%')
+            </if>
+            <if test="SearchPojo.iphash != null ">
+                or Post.IpHash like concat('%', #{SearchPojo.iphash}, '%')
+            </if>
+            <if test="SearchPojo.devicehash != null ">
+                or Post.DeviceHash like concat('%', #{SearchPojo.devicehash}, '%')
+            </if>
+        </trim>
+    </sql>
+    <!--新增所有列-->
+    <insert id="insert">
+        insert into Post(Id, BoardId, UserId, AnonymousIdentityId, AnonymousName, AnonymousAvatar, AnonymousColor,
+                         Title, Content, ContentText, Images, ViewCount, ReplyCount, LikeCount, FavoriteCount,
+                         ShareCount, ReportCount, HotScore, IsTop, IsEssence, Status, IpHash, DeviceHash, CreatedAt,
+                         UpdatedAt, Deleted)
+        values (#{id}, #{boardid}, #{userid}, #{anonymousidentityid}, #{anonymousname}, #{anonymousavatar},
+                #{anonymouscolor}, #{title}, #{content}, #{contenttext}, #{images}, #{viewcount}, #{replycount},
+                #{likecount}, #{favoritecount}, #{sharecount}, #{reportcount}, #{hotscore}, #{istop}, #{isessence},
+                #{status}, #{iphash}, #{devicehash}, #{createdat}, #{updatedat}, #{deleted})
+    </insert>
+
+    <!--通过主键修改数据-->
+    <update id="update">
+        update Post
+        <set>
+            <if test="boardid != null">
+                BoardId =#{boardid},
+            </if>
+            <if test="userid != null">
+                UserId =#{userid},
+            </if>
+            <if test="anonymousidentityid != null">
+                AnonymousIdentityId =#{anonymousidentityid},
+            </if>
+            <if test="anonymousname != null ">
+                AnonymousName =#{anonymousname},
+            </if>
+            <if test="anonymousavatar != null ">
+                AnonymousAvatar =#{anonymousavatar},
+            </if>
+            <if test="anonymouscolor != null ">
+                AnonymousColor =#{anonymouscolor},
+            </if>
+            <if test="title != null ">
+                Title =#{title},
+            </if>
+            <if test="content != null ">
+                Content =#{content},
+            </if>
+            <if test="contenttext != null ">
+                ContentText =#{contenttext},
+            </if>
+            <if test="images != null ">
+                Images =#{images},
+            </if>
+            <if test="viewcount != null">
+                ViewCount =#{viewcount},
+            </if>
+            <if test="replycount != null">
+                ReplyCount =#{replycount},
+            </if>
+            <if test="likecount != null">
+                LikeCount =#{likecount},
+            </if>
+            <if test="favoritecount != null">
+                FavoriteCount =#{favoritecount},
+            </if>
+            <if test="sharecount != null">
+                ShareCount =#{sharecount},
+            </if>
+            <if test="reportcount != null">
+                ReportCount =#{reportcount},
+            </if>
+            <if test="hotscore != null">
+                HotScore =#{hotscore},
+            </if>
+            <if test="istop != null">
+                IsTop =#{istop},
+            </if>
+            <if test="isessence != null">
+                IsEssence =#{isessence},
+            </if>
+            <if test="status != null">
+                Status =#{status},
+            </if>
+            <if test="iphash != null ">
+                IpHash =#{iphash},
+            </if>
+            <if test="devicehash != null ">
+                DeviceHash =#{devicehash},
+            </if>
+            <if test="createdat != null">
+                CreatedAt =#{createdat},
+            </if>
+            <if test="updatedat != null">
+                UpdatedAt =#{updatedat},
+            </if>
+            <if test="deleted != null">
+                Deleted =#{deleted},
+            </if>
+        </set>
+        where Id = #{id}
+    </update>
+
+    <!--通过主键删除-->
+    <delete id="delete">
+        delete
+        from Post
+        where Id = #{key}
+    </delete>
+</mapper>
+

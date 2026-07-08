@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="zzz.service.forum.mapper.BoardMapper">
+
+    <!--查询单个-->
+    <select id="getEntity" resultType="zzz.service.forum.domain.pojo.BoardPojo">
+        select Id,
+               Name,
+               Code,
+               Icon,
+               Description,
+               SortOrder,
+               PostCount,
+               FollowCount,
+               Status,
+               CreatedAt,
+               UpdatedAt
+        from Board
+        where Board.Id = #{key}
+    </select>
+    <sql id="selectBoardVo">
+        select Id,
+               Name,
+               Code,
+               Icon,
+               Description,
+               SortOrder,
+               PostCount,
+               FollowCount,
+               Status,
+               CreatedAt,
+               UpdatedAt
+        from Board
+    </sql>
+
+    <!--查询指定行数据-->
+    <select id="getPageList" parameterType="zzz.service.forum.domain.dto.QueryParam"
+            resultType="zzz.service.forum.domain.pojo.BoardPojo">
+        <include refid="selectBoardVo"/>
+        where 1 = 1
+        <if test="filterstr != null ">
+            ${filterstr}
+        </if>
+        <if test="DateRange != null ">
+            <if test="DateRange.DateColumn ==null or DateRange.DateColumn == ''">
+                and Board.CreatedAt BETWEEN #{DateRange.StartDate} and #{DateRange.EndDate}
+            </if>
+            <if test="DateRange.DateColumn !=null and DateRange.DateColumn != ''">
+                and ${DateRange.DateColumn} BETWEEN #{DateRange.startDate} and #{DateRange.endDate}
+            </if>
+        </if>
+        <if test="SearchPojo != null ">
+            <if test="SearchType==0">
+                <include refid="and"></include>
+            </if>
+            <if test="SearchType==1">
+                <include refid="or"></include>
+            </if>
+        </if>
+        order by ${orderBy}
+        <if test="OrderType==0">asc</if>
+        <if test="OrderType==1">desc</if>
+    </select>
+    <sql id="and">
+        <if test="SearchPojo.name != null and SearchPojo.name != ''">
+            and Board.name like concat('%', #{SearchPojo.name}, '%')
+        </if>
+        <if test="SearchPojo.code != null and SearchPojo.code != ''">
+            and Board.code like concat('%', #{SearchPojo.code}, '%')
+        </if>
+        <if test="SearchPojo.icon != null and SearchPojo.icon != ''">
+            and Board.icon like concat('%', #{SearchPojo.icon}, '%')
+        </if>
+        <if test="SearchPojo.description != null and SearchPojo.description != ''">
+            and Board.description like concat('%', #{SearchPojo.description}, '%')
+        </if>
+    </sql>
+    <sql id="or">
+        <trim prefix=" AND (" suffix=")" prefixOverrides="AND |OR ">
+            <if test="SearchPojo.name != null and SearchPojo.name != ''">
+                or Board.Name like concat('%', #{SearchPojo.name}, '%')
+            </if>
+            <if test="SearchPojo.code != null and SearchPojo.code != ''">
+                or Board.Code like concat('%', #{SearchPojo.code}, '%')
+            </if>
+            <if test="SearchPojo.icon != null and SearchPojo.icon != ''">
+                or Board.Icon like concat('%', #{SearchPojo.icon}, '%')
+            </if>
+            <if test="SearchPojo.description != null and SearchPojo.description != ''">
+                or Board.Description like concat('%', #{SearchPojo.description}, '%')
+            </if>
+        </trim>
+    </sql>
+
+    <!--查询List-->
+    <select id="getList" resultType="zzz.service.forum.domain.pojo.BoardPojo">
+        select Id,
+               Name,
+               Code,
+               Icon,
+               Description,
+               SortOrder,
+               PostCount,
+               FollowCount,
+               Status,
+               CreatedAt,
+               UpdatedAt
+        from Board
+    </select>
+
+    <!--新增所有列-->
+    <insert id="insert">
+        insert into Board(Id, Name, Code, Icon, Description, SortOrder, PostCount, FollowCount, Status, CreatedAt,
+                          UpdatedAt)
+        values (#{id}, #{name}, #{code}, #{icon}, #{description}, #{sortorder}, #{postcount}, #{followcount}, #{status},
+                #{createdat}, #{updatedat})
+    </insert>
+
+    <!--通过主键修改数据-->
+    <update id="update">
+        update Board
+        <set>
+            <if test="name != null ">
+                Name = #{name},
+            </if>
+            <if test="code != null ">
+                Code = #{code},
+            </if>
+            <if test="icon != null ">
+                Icon = #{icon},
+            </if>
+            <if test="description != null ">
+                Description = #{description},
+            </if>
+            <if test="sortorder != null">
+                SortOrder = #{sortorder},
+            </if>
+            <if test="postcount != null">
+                PostCount = #{postcount},
+            </if>
+            <if test="followcount != null">
+                FollowCount = #{followcount},
+            </if>
+            <if test="status != null">
+                Status = #{status},
+            </if>
+            <if test="createdat != null">
+                CreatedAt = #{createdat},
+            </if>
+            <if test="updatedat != null">
+                UpdatedAt = #{updatedat},
+            </if>
+        </set>
+        where Id = #{id}
+    </update>
+
+    <!--通过主键删除-->
+    <delete id="delete">
+        delete
+        from Board
+        where Id = #{key}
+    </delete>
+
+</mapper>
+

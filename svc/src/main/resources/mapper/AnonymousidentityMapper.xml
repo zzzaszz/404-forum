@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="zzz.service.forum.mapper.AnonymousidentityMapper">
+
+    <!--查询单个-->
+    <select id="getEntity" resultType="zzz.service.forum.domain.pojo.AnonymousidentityPojo">
+        select Id, UserId, PostId, AnonymousName, AnonymousAvatar, AnonymousColor, CreatedAt
+        from AnonymousIdentity
+        where AnonymousIdentity.Id = #{key}
+    </select>
+    <sql id="selectAnonymousidentityVo">
+        select Id, UserId, PostId, AnonymousName, AnonymousAvatar, AnonymousColor, CreatedAt
+        from AnonymousIdentity
+    </sql>
+
+    <!--查询指定行数据-->
+    <select id="getPageList" parameterType="zzz.service.forum.domain.dto.QueryParam"
+            resultType="zzz.service.forum.domain.pojo.AnonymousidentityPojo">
+        <include refid="selectAnonymousidentityVo"/>
+        where 1 = 1 and AnonymousIdentity.Tenantid =#{tenantid}
+        <if test="filterstr != null ">
+            ${filterstr}
+        </if>
+        <if test="DateRange != null ">
+            <if test="DateRange.DateColumn ==null or DateRange.DateColumn == ''">
+                and AnonymousIdentity.CreatedAt BETWEEN #{DateRange.StartDate} and #{DateRange.EndDate}
+            </if>
+            <if test="DateRange.DateColumn !=null and DateRange.DateColumn != ''">
+                and #{DateRange.DateColumn} BETWEEN #{DateRange.StartDate} and #{DateRange.EndDate}
+            </if>
+        </if>
+        <if test="SearchPojo != null ">
+            <if test="SearchType==0">
+                <include refid="and"></include>
+            </if>
+            <if test="SearchType==1">
+                <include refid="or"></include>
+            </if>
+        </if>
+        order by ${orderBy}
+        <if test="OrderType==0">asc</if>
+        <if test="OrderType==1">desc</if>
+    </select>
+    <sql id="and">
+        <if test="SearchPojo.anonymousname != null ">
+            and AnonymousIdentity.AnonymousName like concat('%', #{SearchPojo.anonymousname}, '%')
+        </if>
+        <if test="SearchPojo.anonymousavatar != null ">
+            and AnonymousIdentity.AnonymousAvatar like concat('%', #{SearchPojo.anonymousavatar}, '%')
+        </if>
+        <if test="SearchPojo.anonymouscolor != null ">
+            and AnonymousIdentity.AnonymousColor like concat('%', #{SearchPojo.anonymouscolor}, '%')
+        </if>
+    </sql>
+    <sql id="or">
+        <trim prefix=" AND (" suffix=")" prefixOverrides="AND |OR ">
+            <if test="SearchPojo.anonymousname != null ">
+                or AnonymousIdentity.AnonymousName like concat('%', #{SearchPojo.anonymousname}, '%')
+            </if>
+            <if test="SearchPojo.anonymousavatar != null ">
+                or AnonymousIdentity.AnonymousAvatar like concat('%', #{SearchPojo.anonymousavatar}, '%')
+            </if>
+            <if test="SearchPojo.anonymouscolor != null ">
+                or AnonymousIdentity.AnonymousColor like concat('%', #{SearchPojo.anonymouscolor}, '%')
+            </if>
+        </trim>
+    </sql>
+    <!--新增所有列-->
+    <insert id="insert">
+        insert into AnonymousIdentity(Id, UserId, PostId, AnonymousName, AnonymousAvatar, AnonymousColor, CreatedAt)
+        values (#{id}, #{userid}, #{postid}, #{anonymousname}, #{anonymousavatar}, #{anonymouscolor}, #{createdat})
+    </insert>
+
+    <!--通过主键修改数据-->
+    <update id="update">
+        update AnonymousIdentity
+        <set>
+            <if test="userid != null">
+                UserId =#{userid},
+            </if>
+            <if test="postid != null">
+                PostId =#{postid},
+            </if>
+            <if test="anonymousname != null ">
+                AnonymousName =#{anonymousname},
+            </if>
+            <if test="anonymousavatar != null ">
+                AnonymousAvatar =#{anonymousavatar},
+            </if>
+            <if test="anonymouscolor != null ">
+                AnonymousColor =#{anonymouscolor},
+            </if>
+            <if test="createdat != null">
+                CreatedAt =#{createdat},
+            </if>
+        </set>
+        where Id = #{id} and Tenantid =#{tenantid}
+    </update>
+
+    <!--通过主键删除-->
+    <delete id="delete">
+        delete
+        from AnonymousIdentity
+        where Id = #{key}
+    </delete>
+</mapper>
+

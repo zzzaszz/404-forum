@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:element-plus.org)",
+      "Bash(npm ls:*)",
+      "Bash(node -e:*)"
+    ]
+  }
+}
