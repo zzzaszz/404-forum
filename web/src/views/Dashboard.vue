@@ -19,33 +19,42 @@ export default { name: 'Dashboard' }
       </div>
     </div>
 
-    <!-- 快捷操作 -->
-    <div class="quick-grid">
-      <router-link to="/chat" class="quick-item">
-        <div class="quick-icon">
-          <el-icon><ChatDotRound /></el-icon>
+    <!-- 快捷入口：平均分布 -->
+    <div class="quick-section">
+      <div class="quick-scroll">
+        <!-- 动态板块（仅首页显示），最多 8 个 -->
+        <div
+          v-for="board in quickBoards.slice(0, 8)"
+          :key="board.code"
+          class="quick-item"
+          @click="goBoard(board)"
+        >
+          <div class="quick-icon">
+            <el-icon><component :is="board.icon" /></el-icon>
+          </div>
+          <span class="quick-label">{{ board.name }}</span>
         </div>
-        <span class="quick-label">聊天室</span>
-      </router-link>
-      <router-link to="/topic/random" class="quick-item">
-        <div class="quick-icon">
-          <el-icon><ChatLineRound /></el-icon>
-        </div>
-        <span class="quick-label">随便聊聊</span>
-      </router-link>
-      <router-link to="/hot" class="quick-item">
-        <div class="quick-icon">
-          <el-icon><TrendCharts /></el-icon>
-        </div>
-        <span class="quick-label">热门</span>
-      </router-link>
-      <router-link to="/messages" class="quick-item">
-        <div class="quick-icon">
-          <el-icon><Message /></el-icon>
-        </div>
-        <span class="quick-label">私信</span>
-        <span v-if="unreadCount > 0" class="unread-dot">{{ unreadCount }}</span>
-      </router-link>
+        <!-- 固定入口 -->
+        <router-link to="/chat" class="quick-item">
+          <div class="quick-icon">
+            <el-icon><ChatDotRound /></el-icon>
+          </div>
+          <span class="quick-label">聊天室</span>
+        </router-link>
+        <router-link to="/hot" class="quick-item">
+          <div class="quick-icon">
+            <el-icon><TrendCharts /></el-icon>
+          </div>
+          <span class="quick-label">热门</span>
+        </router-link>
+        <router-link to="/messages" class="quick-item">
+          <div class="quick-icon">
+            <el-icon><Message /></el-icon>
+          </div>
+          <span class="quick-label">私信</span>
+          <span v-if="unreadCount > 0" class="unread-dot">{{ unreadCount }}</span>
+        </router-link>
+      </div>
     </div>
 
     <!-- 主内容 -->
@@ -54,7 +63,7 @@ export default { name: 'Dashboard' }
       <div class="topics-panel">
         <div class="panel-header">
           <h3>最新话题</h3>
-          <el-button type="primary" size="small" round @click="router.push('/topic/random')">
+          <el-button type="primary" size="small" round @click="handlePublish">
             发布
           </el-button>
         </div>
@@ -89,7 +98,7 @@ export default { name: 'Dashboard' }
             <div v-for="(item, idx) in hotTopics" :key="item.id" class="hot-row" @click="goTopic(item)">
               <span class="hot-rank" :class="{ top: idx < 3 }">{{ idx + 1 }}</span>
               <span class="hot-title">{{ item.title }}</span>
-              <span class="hot-heat">{{ formatHeat(item.heat) }}</span>
+              <span class="hot-heat">{{ item.comments || 0 }} 评</span>
             </div>
           </div>
         </div>
@@ -112,7 +121,7 @@ export default { name: 'Dashboard' }
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import {
@@ -121,7 +130,12 @@ import {
   ChatLineRound,
   Message,
   TrendCharts,
-  View
+  View,
+  Coffee,
+  Monitor,
+  VideoPlay,
+  QuestionFilled,
+  Collection
 } from '@element-plus/icons-vue'
 import {
   getTopics,
@@ -129,6 +143,7 @@ import {
   getOnlineUsers,
   getForumStats,
   getMessages,
+  getBoardPageList,
   mapTopic,
   pickAvatar
 } from '@/api'
@@ -157,19 +172,43 @@ greeting.value = getGreeting()
 const topics = ref([])
 const hotTopics = ref([])
 const onlineUsers = ref([])
+const quickBoards = ref([])
+
+// 固定板块图标映射
+const BOARD_ICONS = {
+  tech: Monitor,
+  game: VideoPlay,
+  life: Coffee,
+  help: QuestionFilled,
+  random: ChatLineRound
+}
 
 function formatTime(date) {
   if (!date) return ''
   return dayjs(date).format('HH:mm')
 }
 
-function formatHeat(n) {
-  if (n >= 10000) return (n / 10000).toFixed(1) + 'w'
-  return n.toString()
-}
-
 function goTopic(item) {
   router.push(`/topic/${item.id}`)
+}
+
+function goBoard(board) {
+  if (board.code === 'random') router.push('/topic/random')
+  else if (board.code === 'tech') router.push('/topic/tech')
+  else if (board.code === 'game') router.push('/topic/game')
+  else if (board.code === 'life') router.push('/topic/life')
+  else if (board.code === 'help') router.push('/topic/help')
+  else router.push(`/topic/board/${board.code}`)
+}
+
+function handlePublish() {
+  // 跳转到第一个可用板块发布话题
+  const first = quickBoards.value[0]
+  if (first) {
+    goBoard(first)
+  } else {
+    router.push('/topic/random')
+  }
 }
 
 function onlineAvatar(id) {
@@ -183,32 +222,42 @@ async function loadDashboard() {
       onlineCount.value = stats.data.onlineCount || 0
       activeTopics.value = stats.data.activeTopics || 0
     }
-  } catch (e) { /* 忽略统计加载失败 */
-  }
+  } catch (e) { /* 忽略 */ }
 
   try {
     const res = await getTopics({sort: 'latest', pageNum: 1, pageSize: 5})
     topics.value = (res.data?.list || []).map(mapTopic)
-  } catch (e) { /* 忽略 */
-  }
+  } catch (e) { /* 忽略 */ }
 
   try {
     const res = await getHotTopics(5)
     hotTopics.value = (res.data || []).map(mapTopic)
-  } catch (e) { /* 忽略 */
-  }
+  } catch (e) { /* 忽略 */ }
 
   try {
     const res = await getOnlineUsers()
     onlineUsers.value = res.data?.users || []
-  } catch (e) { /* 忽略 */
-  }
+  } catch (e) { /* 忽略 */ }
 
   try {
     const res = await getMessages()
     unreadCount.value = res.data?.unread || 0
-  } catch (e) { /* 未登录或无私信 */
-  }
+  } catch (e) { /* 忽略 */ }
+
+  // 加载活跃板块作为快捷入口（只显示首页快捷=1的板块）
+  try {
+    const boardRes = await getBoardPageList({PageNum: 1, PageSize: 50})
+    const boards = (boardRes.data?.list || [])
+      .filter(b => b.status === 1 && b.showonhome === 1)
+      .sort((a, b) => (b.sortorder ?? 0) - (a.sortorder ?? 0))
+      .slice(0, 8)
+      .map(b => ({
+        code: b.code,
+        name: b.name,
+        icon: markRaw(BOARD_ICONS[b.code] || Collection)
+      }))
+    quickBoards.value = boards
+  } catch (e) { /* 忽略 */ }
 }
 
 onMounted(loadDashboard)
@@ -260,10 +309,13 @@ onMounted(loadDashboard)
   font-size: 14px;
 }
 
-/* 快捷操作 */
-.quick-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+/* 快捷入口：平均分布，填满整行 */
+.quick-section {
+  overflow: hidden;
+}
+
+.quick-scroll {
+  display: flex;
   gap: 12px;
 }
 
@@ -272,7 +324,9 @@ onMounted(loadDashboard)
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 20px 16px;
+  padding: 16px 10px;
+  flex: 1 1 0;
+  min-width: 0;
   background: var(--bg-white);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
@@ -562,8 +616,9 @@ onMounted(loadDashboard)
 }
 
 @media (max-width: 768px) {
-  .quick-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .quick-item {
+    padding: 14px 8px;
+    gap: 4px;
   }
   .side-panel {
     grid-template-columns: 1fr;

@@ -259,11 +259,12 @@ export function mapTopic(p) {
     title: p.title || '',
     content: p.content || '',
     author: p.anonymousname || '用户',
-    // 头像优先使用后端路径；emoji 等老数据回退到 pickAvatar
+    // 头像优先使用后端路径（新数据已按用户设置）；emoji 老数据或缺失时按用户 ID 回退
     avatar: (p.anonymousavatar && !isEmoji(p.anonymousavatar))
         ? p.anonymousavatar
-        : pickAvatar(p.id),
-    color: p.anonymouscolor || '#7C3AED',
+        : pickAvatar(p.userid || p.id),
+    // 颜色优先后端；缺失时按用户 ID 取色
+    color: p.anonymouscolor || pickColor(p.userid || p.id),
     views: p.viewcount || 0,
     comments: p.replycount || 0,
     likes: p.likecount || 0,
@@ -277,18 +278,30 @@ export function mapTopic(p) {
   }
 }
 
+/** 根据用户 ID 生成稳定的颜色（hash 取色） */
+function pickColor(id) {
+  if (id == null) return '#7C3AED'
+  const COLOR_POOL = [
+    '#7C3AED', '#3B82F6', '#16A34A', '#EA580C', '#F59E0B', '#EF4444',
+    '#0EA5E9', '#8B5CF6', '#EC4899', '#14B8A6'
+  ]
+  const num = typeof id === 'number' ? id : parseInt(String(id).replace(/[^0-9]/g, ''), 10)
+  const idx = (Number.isNaN(num) ? 0 : Math.abs(num)) % COLOR_POOL.length
+  return COLOR_POOL[idx]
+}
+
 /** 将评论 Pojo 映射为前端评论对象 */
 export function mapComment(c) {
   if (!c) return null
   return {
     id: c.id,
     postId: c.postid,
+    userId: c.userid,
     author: c.anonymousname || '用户',
-    // 头像优先使用后端路径；emoji 等老数据回退到 pickAvatar
-    avatar: (c.anonymousavatar && !isEmoji(c.anonymousavatar))
-        ? c.anonymousavatar
-        : pickAvatar(c.id),
-    color: c.anonymouscolor || '#7C3AED',
+    // 头像按评论用户 ID 稳定映射，评论人固定头像；老评论（无 userid）回退按评论 ID
+    avatar: pickAvatar(c.userid || c.id),
+    // 颜色按用户 ID 取色，颜色跟着用户走
+    color: pickColor(c.userid || c.id),
     content: c.content || '',
     likes: c.likecount || 0,
     replies: c.replycount || 0,

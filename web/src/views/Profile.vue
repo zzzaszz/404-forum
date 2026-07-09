@@ -74,6 +74,18 @@
               <el-form-item label="个性签名">
                 <el-input v-model="profileForm.signature" type="textarea" :rows="3" placeholder="写一句话介绍自己" maxlength="100" show-word-limit />
               </el-form-item>
+              <el-form-item label="头像颜色">
+                <div class="avatar-colors">
+                  <div
+                    v-for="color in avatarColors"
+                    :key="color.value"
+                    class="color-option"
+                    :class="{ active: profileForm.avatarColor === color.value }"
+                    :style="{ background: color.gradient }"
+                    @click="profileForm.avatarColor = color.value"
+                  ></div>
+                </div>
+              </el-form-item>
               <el-form-item label="主题颜色">
                 <div class="theme-color-picker">
                   <el-color-picker v-model="profileForm.themeColor" @change="onThemeColorChange" />
@@ -230,6 +242,17 @@ const profileForm = ref({
 
 const DEFAULT_THEME_COLOR = '#7C3AED'
 
+// 头像颜色预设
+const avatarColors = [
+  { value: 'purple', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
+  { value: 'blue', gradient: 'linear-gradient(135deg, #3498db, #2980b9)' },
+  { value: 'green', gradient: 'linear-gradient(135deg, #27ae60, #2ecc71)' },
+  { value: 'orange', gradient: 'linear-gradient(135deg, #f39c12, #e74c3c)' },
+  { value: 'pink', gradient: 'linear-gradient(135deg, #f64f59, #c471ed)' },
+  { value: 'teal', gradient: 'linear-gradient(135deg, #1abc9c, #16a085)' },
+  { value: 'indigo', gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)' }
+]
+
 // 隐私设置
 const privacySettings = ref({
   hideOnline: false,
@@ -353,8 +376,43 @@ const formatTime = (date) => {
   return dayjs(date).format('YYYY-MM-DD HH:mm')
 }
 
+// 加载用户动态统计
+async function loadUserStats() {
+  try {
+    const { getTopics, getForumStats } = await import('@/api')
+    // 尝试通过 forum API 获取统计数据
+    const statsRes = await getForumStats()
+    if (statsRes.data) {
+      userStats.value.posts = statsRes.data.totalTopics || 0
+      userStats.value.comments = statsRes.data.totalComments || 0
+    }
+    // 获赞数暂用本地缓存
+    const storedInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    userStats.value.likes = storedInfo.likes || 0
+  } catch { /* 忽略 */ }
+}
+
+// 加载活动记录
+async function loadActivityHistory() {
+  try {
+    const { getTopics } = await import('@/api')
+    const res = await getTopics({sort: 'latest', pageNum: 1, pageSize: 10})
+    const list = (res.data?.list || []).slice(0, 5)
+    activityHistory.value = list.map(item => ({
+      id: item.id,
+      type: 'post',
+      title: item.title || '发布了新话题',
+      time: item.createdat
+    }))
+  } catch {
+    // 保持默认空列表
+  }
+}
+
 onMounted(() => {
   loadUserInfo()
+  loadUserStats()
+  loadActivityHistory()
   // 初始化时应用已保存的主题颜色
   const storedInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
   if (storedInfo.themeColor) {
@@ -482,6 +540,31 @@ onMounted(() => {
 /* 个人资料表单 */
 .profile-form { padding: 16px 0; }
 .form-tip { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+/* 头像颜色预设 */
+.avatar-colors {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.color-option {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  border: 2px solid transparent;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+}
+
+.color-option.active {
+  border-color: var(--text-primary);
+  transform: scale(1.1);
+}
 
 /* 主题颜色选择器 */
 .theme-color-picker {

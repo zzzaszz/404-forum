@@ -29,6 +29,8 @@ public class BoardEntity implements Serializable {
     private Integer followcount;
     // 状态：1正常 0隐藏
     private Integer status;
+    // 是否在首页快捷入口显示：1显示 0不显示
+    private Integer showonhome;
     // 创建时间
     private Date createdat;
     // 更新时间
@@ -113,6 +115,14 @@ public class BoardEntity implements Serializable {
 
     public void setStatus(Integer status) {
         this.status = status;
+    }
+
+    public Integer getShowonhome() {
+        return showonhome;
+    }
+
+    public void setShowonhome(Integer showonhome) {
+        this.showonhome = showonhome;
     }
 
     // 创建时间

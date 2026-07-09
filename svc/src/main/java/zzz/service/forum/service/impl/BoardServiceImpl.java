@@ -135,6 +135,7 @@ public class BoardServiceImpl implements BoardService {
         if (boardPojo.getPostcount() == null) boardPojo.setPostcount(0);
         if (boardPojo.getFollowcount() == null) boardPojo.setFollowcount(0);
         if (boardPojo.getStatus() == null) boardPojo.setStatus(0);
+        if (boardPojo.getShowonhome() == null) boardPojo.setShowonhome(0);
         if (boardPojo.getCreatedat() == null) boardPojo.setCreatedat(new Date());
         if (boardPojo.getUpdatedat() == null) boardPojo.setUpdatedat(new Date());
         return boardPojo;

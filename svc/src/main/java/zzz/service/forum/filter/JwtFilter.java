@@ -41,6 +41,7 @@ public class JwtFilter extends OncePerRequestFilter {
             return;
         }
 
+        // 尝试解析 Token 并设置 UserContext（不做 401 拦截，由 AuthAspect AOP 统一处理）
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && !authHeader.isEmpty()) {
             String token = authHeader;
@@ -48,26 +49,16 @@ public class JwtFilter extends OncePerRequestFilter {
                 token = token.substring(7);
             }
             try {
-                // Validate token type is access
-                if (!JwtUtils.isAccessToken(token)) {
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    return;
+                if (JwtUtils.isAccessToken(token)) {
+                    Long userId = JwtUtils.parseToken(token).get("userId", Long.class);
+                    String redisKey = ACCESS_TOKEN_KEY_PREFIX + userId;
+                    String storedToken = redisService.getCacheObject(redisKey);
+                    if (storedToken != null && storedToken.equals(token)) {
+                        UserContext.setUserId(userId);
+                    }
                 }
-
-                Long userId = JwtUtils.parseToken(token).get("userId", Long.class);
-
-                // Validate token exists in Redis and matches
-                String redisKey = ACCESS_TOKEN_KEY_PREFIX + userId;
-                String storedToken = redisService.getCacheObject(redisKey);
-                if (storedToken == null || !storedToken.equals(token)) {
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    return;
-                }
-
-                UserContext.setUserId(userId);
-            } catch (Exception e) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                return;
+            } catch (Exception ignored) {
+                // Token 无效时由 AuthAspect 返回 401
             }
         }
 

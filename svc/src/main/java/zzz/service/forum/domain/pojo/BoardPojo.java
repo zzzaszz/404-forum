@@ -40,6 +40,9 @@ public class BoardPojo implements Serializable {
     // 状态：1正常 0隐藏
     @Excel(name = "状态：1正常 0隐藏")
     private Integer status;
+    // 是否首页快捷显示：1显示 0不显示
+    @Excel(name = "是否首页快捷显示")
+    private Integer showonhome;
     // 创建时间
     @Excel(name = "创建时间")
     private Date createdat;
@@ -126,6 +129,14 @@ public class BoardPojo implements Serializable {
 
     public void setStatus(Integer status) {
         this.status = status;
+    }
+
+    public Integer getShowonhome() {
+        return showonhome;
+    }
+
+    public void setShowonhome(Integer showonhome) {
+        this.showonhome = showonhome;
     }
 
     // 创建时间

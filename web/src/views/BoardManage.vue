@@ -235,6 +235,14 @@ export default {name: 'BoardManage'}
               @change="onStatusChange"
           />
         </el-form-item>
+        <el-form-item label="首页快捷">
+          <el-switch
+              v-model="showOnHomeSwitch"
+              active-text="显示"
+              inactive-text="不显示"
+              @change="onShowOnHomeChange"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -289,13 +297,18 @@ const formData = reactive({
   icon: '',
   description: '',
   sortorder: 0,
-  status: 1
+  status: 1,
+  showonhome: 0
 })
 
 // 单独用 ref 追踪开关状态，避免 el-switch 与 reactive 对象同步时丢失 falsy 值
 const statusSwitch = ref(true)
 const onStatusChange = (val) => {
   formData.status = val ? 1 : 0
+}
+const showOnHomeSwitch = ref(false)
+const onShowOnHomeChange = (val) => {
+  formData.showonhome = val ? 1 : 0
 }
 
 const formRules = {
@@ -381,6 +394,7 @@ function handleCreate() {
   editingId.value = null
   resetForm()
   statusSwitch.value = true
+  showOnHomeSwitch.value = false
   dialogVisible.value = true
 }
 
@@ -393,7 +407,9 @@ function handleEdit(row) {
   formData.description = row.description || ''
   formData.sortorder = row.sortorder ?? 0
   formData.status = row.status ?? 1
+  formData.showonhome = row.showonhome ?? 0
   statusSwitch.value = (row.status ?? 1) === 1
+  showOnHomeSwitch.value = (row.showonhome ?? 0) === 1
   dialogVisible.value = true
 }
 
@@ -455,6 +471,7 @@ function resetForm() {
   formData.description = ''
   formData.sortorder = 0
   formData.status = 1
+  formData.showonhome = 0
   if (formRef.value) {
     formRef.value.resetFields()
   }

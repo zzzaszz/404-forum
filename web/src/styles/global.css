@@ -256,13 +256,11 @@ html, body {
 
 .el-input__wrapper:hover {
   box-shadow: none !important;
-  border-color: var(--border-dark) !important;
 }
 
 .el-input__wrapper.is-focus {
-  outline: none;
+  outline: none !important;
   box-shadow: none !important;
-  border-color: var(--primary-color) !important;
 }
 
 /* 分页样式优化 */

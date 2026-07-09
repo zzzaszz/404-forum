@@ -13,6 +13,7 @@
                PostCount,
                FollowCount,
                Status,
+               ShowOnHome,
                CreatedAt,
                UpdatedAt
         from Board
@@ -28,6 +29,7 @@
                PostCount,
                FollowCount,
                Status,
+               ShowOnHome,
                CreatedAt,
                UpdatedAt
         from Board
@@ -103,6 +105,7 @@
                PostCount,
                FollowCount,
                Status,
+               ShowOnHome,
                CreatedAt,
                UpdatedAt
         from Board
@@ -110,10 +113,10 @@
 
     <!--新增所有列-->
     <insert id="insert">
-        insert into Board(Id, Name, Code, Icon, Description, SortOrder, PostCount, FollowCount, Status, CreatedAt,
+        insert into Board(Id, Name, Code, Icon, Description, SortOrder, PostCount, FollowCount, Status, ShowOnHome, CreatedAt,
                           UpdatedAt)
         values (#{id}, #{name}, #{code}, #{icon}, #{description}, #{sortorder}, #{postcount}, #{followcount}, #{status},
-                #{createdat}, #{updatedat})
+                #{showonhome}, #{createdat}, #{updatedat})
     </insert>
 
     <!--通过主键修改数据-->
@@ -143,6 +146,9 @@
             </if>
             <if test="status != null">
                 Status = #{status},
+            </if>
+            <if test="showonhome != null">
+                ShowOnHome = #{showonhome},
             </if>
             <if test="createdat != null">
                 CreatedAt = #{createdat},
