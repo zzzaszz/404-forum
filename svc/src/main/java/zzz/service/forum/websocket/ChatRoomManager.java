@@ -33,12 +33,29 @@ public class ChatRoomManager {
     /** roomId → 房间名称 */
     private final Map<Integer, String> roomNames = new ConcurrentHashMap<>();
 
+    /** sessionId → 用户信息 {userId, nickname} */
+    private final Map<String, Map<String, Object>> sessionUsers = new ConcurrentHashMap<>();
+
     public ChatRoomManager() {
         for (String[] room : DEFAULT_ROOMS) {
             int id = Integer.parseInt(room[0]);
             rooms.put(id, new ConcurrentHashMap<>());
             roomNames.put(id, room[1]);
         }
+    }
+
+    /** 记录用户信息 */
+    public void setUserInfo(String sessionId, Long userId, String nickname) {
+        Map<String, Object> info = new HashMap<>();
+        info.put("userId", userId != null ? userId.toString() : sessionId);
+        info.put("nickname", nickname);
+        sessionUsers.put(sessionId, info);
+    }
+
+    /** 移除用户信息 */
+    public void removeUser(String sessionId) {
+        sessionUsers.remove(sessionId);
+        leaveCurrentRoom(sessionId);
     }
 
     /** 获取房间名称 */
@@ -117,5 +134,22 @@ public class ChatRoomManager {
 
     public Map<Integer, Map<String, WebSocketSession>> getRooms() {
         return rooms;
+    }
+
+    /** 获取房间在线用户列表 */
+    public List<Map<String, Object>> getRoomUsers(int roomId) {
+        List<Map<String, Object>> users = new ArrayList<>();
+        Map<String, WebSocketSession> room = rooms.get(roomId);
+        if (room == null) return users;
+        for (String sid : room.keySet()) {
+            Map<String, Object> info = sessionUsers.get(sid);
+            if (info != null) {
+                Map<String, Object> u = new HashMap<>();
+                u.put("userId", info.get("userId"));
+                u.put("nickname", info.get("nickname"));
+                users.add(u);
+            }
+        }
+        return users;
     }
 }

@@ -121,12 +121,6 @@
           </el-breadcrumb>
         </div>
         <div class="header-right">
-          <!-- 通知图标 -->
-          <el-badge :value="notificationCount" :hidden="notificationCount === 0" :max="99" class="notification-badge">
-            <el-icon :size="20" class="notification-icon" @click="router.push('/messages')">
-              <Bell />
-            </el-icon>
-          </el-badge>
           <el-dropdown>
             <span class="user-dropdown" tabindex="0">
               <el-avatar :size="32" class="user-avatar">
@@ -150,7 +144,7 @@
 
       <el-main class="main-content" id="main-content">
         <router-view v-slot="{ Component, route: r }">
-          <keep-alive :include="['Dashboard']">
+          <keep-alive :include="['Dashboard','ChatRoom']">
             <component :is="Component" :key="r.fullPath" />
           </keep-alive>
         </router-view>
@@ -165,7 +159,6 @@ import {useRoute, useRouter} from 'vue-router'
 import {ElMessage} from 'element-plus'
 import {
   ArrowDown,
-  Bell,
   ChatDotRound,
   ChatLineRound,
   Coffee,
@@ -183,7 +176,7 @@ import {
   UserFilled,
   VideoPlay
 } from '@element-plus/icons-vue'
-import {getBoardPageList, getMessages, logout} from '@/api'
+import {getBoardPageList, logout} from '@/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -191,7 +184,6 @@ const isCollapsed = ref(false)
 const isLoggingOut = ref(false)
 const isMobile = ref(false)
 const mobileDrawerOpen = ref(false)
-const notificationCount = ref(0)
 
 // 当前用户角色（1=管理员）
 const isAdmin = computed(() => {
@@ -259,20 +251,10 @@ function checkMobile() {
   }
 }
 
-async function fetchNotificationCount() {
-  try {
-    const res = await getMessages()
-    notificationCount.value = res.data?.unread || 0
-  } catch { /* 未登录忽略 */ }
-}
-
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
   fetchBoards()
-  fetchNotificationCount()
-  // 每 30 秒刷新通知数
-  setInterval(fetchNotificationCount, 30000)
 })
 
 onBeforeUnmount(() => {
@@ -628,22 +610,6 @@ const handleLogout = async () => {
   display: flex;
   align-items: center;
   gap: 16px;
-}
-
-.notification-badge {
-  cursor: pointer;
-}
-
-.notification-icon {
-  color: var(--text-secondary);
-  transition: color var(--transition-fast);
-  padding: 6px;
-  border-radius: 8px;
-}
-
-.notification-icon:hover {
-  color: var(--primary-color);
-  background: var(--bg-light);
 }
 
 /* 面包屑 */

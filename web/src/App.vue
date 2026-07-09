@@ -3,7 +3,14 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElNotification } from 'element-plus'
+import { getMessages } from '@/api'
+
+const router = useRouter()
+let pmTimer = null
+let lastUnread = 0
 
 /** 从 localStorage 加载并应用主题颜色 */
 const applyStoredTheme = () => {
@@ -33,8 +40,42 @@ const adjustColor = (hex, amount) => {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
 }
 
+/** 检查新私信，有则弹出 Notification */
+async function checkNewMessages() {
+  try {
+    const res = await getMessages()
+    const unread = res.data?.unread || 0
+    if (unread > lastUnread) {
+      const list = res.data?.list || []
+      const latest = list.find(m => m.isread === 0 || m.isread === false)
+      if (latest) {
+        const name = latest.sourcename || latest.from || '用户'
+        ElNotification({
+          title: '新私信',
+          message: `${name}: ${(latest.content || '').slice(0, 30)}`,
+          type: 'info',
+          duration: 5000,
+          onClick: () => router.push('/messages'),
+        })
+      }
+    }
+    lastUnread = unread
+  } catch { /* 忽略 */ }
+}
+
 onMounted(() => {
   applyStoredTheme()
+  // 首次检查
+  const token = localStorage.getItem('token')
+  if (token) {
+    checkNewMessages()
+    // 每 20 秒检查新私信
+    pmTimer = setInterval(checkNewMessages, 20000)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (pmTimer) clearInterval(pmTimer)
 })
 </script>
 

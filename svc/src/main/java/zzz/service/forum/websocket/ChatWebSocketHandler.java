@@ -15,6 +15,7 @@ import zzz.service.forum.utils.JwtUtils;
 import javax.annotation.Resource;
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -63,10 +64,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        // 保存用户信息到 session attributes
+        // 保存用户信息
         session.getAttributes().put("nickname", nickname);
         session.getAttributes().put("userId", userId);
         session.getAttributes().put("roomId", roomId);
+        roomManager.setUserInfo(session.getId(), userId, nickname);
 
         int online = roomManager.getRoomOnlineCount(roomId);
         String roomName = roomManager.getRoomName(roomId);
@@ -134,7 +136,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         String nickname = (String) session.getAttributes().get("nickname");
         Integer roomId = (Integer) session.getAttributes().get("roomId");
 
-        roomManager.removeSession(session.getId());
+        roomManager.removeUser(session.getId());
 
         if (roomId != null) {
             int online = roomManager.getRoomOnlineCount(roomId);
@@ -180,15 +182,18 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    /** 推送房间列表给所有在线用户 */
+    /** 推送房间列表（含在线用户）给所有在线用户 */
     private void sendRoomList() {
-        for (Map.Entry<Integer, Map<String, WebSocketSession>> entry : roomManager.getRooms().entrySet()) {
-            // 跳过内部访问，使用 ChatMessage 传递房间列表
+        // 房间列表含在线用户
+        List<Map<String, Object>> roomListData = roomManager.getRoomList();
+        for (Map<String, Object> room : roomListData) {
+            int rid = (Integer) room.get("roomId");
+            room.put("users", roomManager.getRoomUsers(rid));
         }
-        // 遍历所有会话，发送房间列表
+
         ChatMessage listMsg = new ChatMessage();
         listMsg.setType("roomList");
-        listMsg.setContent(JSON.toJSONString(roomManager.getRoomList()));
+        listMsg.setContent(JSON.toJSONString(roomListData));
 
         String json = JSON.toJSONString(listMsg);
         for (Integer roomId : roomManager.getRooms().keySet()) {
