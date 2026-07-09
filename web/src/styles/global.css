@@ -10,7 +10,7 @@
   --accent-color: #7C3AED;
   --accent-light: #A78BFA;
   --accent-dark: #5B21B6;
-  --focus-ring-color: #7C3AED;
+  --focus-ring-color: #3B82F6;
 
   /* 辅助色 */
   --success-color: #27ae60;
@@ -172,6 +172,16 @@ html, body {
   --el-button-hover-border-color: var(--danger-light);
 }
 
+/* 全局按钮：hover/focus/active 不显示额外阴影和 outline，但保留边框 */
+.el-button:hover,
+.el-button:focus,
+.el-button:active,
+.el-button.is-focus,
+.el-button.is-active {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 /* 表格样式优化 */
 .el-table {
   border-radius: var(--radius-md) !important;
@@ -239,15 +249,20 @@ html, body {
 
 .el-input__wrapper {
   border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color) !important;
   transition: all var(--transition-fast);
+  box-shadow: none !important;
 }
 
 .el-input__wrapper:hover {
-  box-shadow: 0 0 0 1px var(--primary-light) inset;
+  box-shadow: none !important;
+  border-color: var(--border-dark) !important;
 }
 
 .el-input__wrapper.is-focus {
-  box-shadow: 0 0 0 1px var(--primary-color) inset;
+  outline: none;
+  box-shadow: none !important;
+  border-color: var(--primary-color) !important;
 }
 
 /* 分页样式优化 */
@@ -434,15 +449,23 @@ html, body {
    焦点管理 - 无障碍访问
    ============================================= */
 
-*:focus-visible {
+/* 仅对键盘可交互元素显示焦点环，避免点击时出现紫色边框 */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+.el-menu-item:focus-visible,
+.el-dropdown-item:focus-visible {
   outline: 2px solid var(--focus-ring-color);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
 
-.el-input__wrapper.is-focus {
+/* 全局去除默认 outline，防止元素点击选中时出现紫色边框 */
+*:focus {
   outline: none;
-  box-shadow: 0 0 0 1px var(--primary-color) inset, 0 0 0 3px var(--focus-ring-color);
 }
 
 /* =============================================

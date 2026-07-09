@@ -25,6 +25,11 @@ public class User {
 
     private String avatar;
 
+    /**
+     * 主题颜色（用户自定义，持久化存储）
+     */
+    private String themeColor;
+
     private Integer status;
 
     /**

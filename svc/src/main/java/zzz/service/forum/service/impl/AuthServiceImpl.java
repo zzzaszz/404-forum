@@ -180,6 +180,8 @@ public class AuthServiceImpl implements AuthService {
                 .userId(userId)
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())
+                .role(user.getRole() == null ? 0 : user.getRole())
+                .themeColor(user.getThemeColor())
                 .build();
     }
 
@@ -222,6 +224,7 @@ public class AuthServiceImpl implements AuthService {
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())
                 .role(user.getRole() == null ? 0 : user.getRole())
+                .themeColor(user.getThemeColor())
                 .build();
     }
 

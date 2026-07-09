@@ -144,8 +144,38 @@ function persistLogin(data) {
     userId: data.userId,
     nickname: data.nickname,
     avatar: data.avatar,
-    role: data.role ?? 0
+    role: data.role ?? 0,
+    themeColor: data.themeColor || '#7C3AED'
   }))
+  // 应用主题颜色到全局 CSS 变量
+  applyThemeColor(data.themeColor || '#7C3AED')
+}
+
+/** 将主题颜色应用到全局 CSS 变量 */
+function applyThemeColor(color) {
+  const root = document.documentElement
+  root.style.setProperty('--accent-color', color)
+  // 生成对应的深色和浅色变体
+  root.style.setProperty('--accent-dark', adjustColor(color, -20))
+  root.style.setProperty('--accent-light', adjustColor(color, 20))
+  root.style.setProperty('--sidebar-active-bg', color)
+}
+
+/** 简单的颜色明度调整（hex 颜色 ±amount） */
+function adjustColor(hex, amount) {
+  let r, g, b
+  if (hex.startsWith('#')) {
+    const num = parseInt(hex.slice(1), 16)
+    r = (num >> 16) & 0xff
+    g = (num >> 8) & 0xff
+    b = num & 0xff
+  } else {
+    return hex
+  }
+  r = Math.max(0, Math.min(255, r + amount))
+  g = Math.max(0, Math.min(255, g + amount))
+  b = Math.max(0, Math.min(255, b + amount))
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
 }
 
 const handleSubmit = async () => {
@@ -281,21 +311,28 @@ onMounted(() => {
   display: flex;
 }
 
-.login-form :deep(.el-input__wrapper) {
+.login-form :deep(.el-input) {
   border-radius: var(--radius-md);
-  padding: 8px 14px;
   background: var(--bg-light);
-  box-shadow: 0 0 0 1px var(--border-light) inset;
+  box-shadow: none;
   transition: all var(--transition-fast);
+  overflow: hidden;
+}
+
+.login-form :deep(.el-input__wrapper) {
+  border-radius: 0 !important;
+  padding: 8px 14px;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .login-form :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px var(--primary-light) inset;
+  box-shadow: none !important;
 }
 
-.login-form :deep(.el-input__wrapper.is-focus) {
+.login-form :deep(.el-input.is-focus) {
   background: var(--bg-white);
-  box-shadow: 0 0 0 2px var(--primary-color) inset;
+  box-shadow: none;
 }
 
 .login-form :deep(.el-input__inner) {

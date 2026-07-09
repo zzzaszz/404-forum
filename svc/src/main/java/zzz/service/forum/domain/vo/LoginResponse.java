@@ -28,4 +28,9 @@ public class LoginResponse {
      * 角色：0 普通用户，1 管理员
      */
     private Integer role;
+
+    /**
+     * 用户自定义主题颜色
+     */
+    private String themeColor;
 }

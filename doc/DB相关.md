@@ -398,6 +398,10 @@ CREATE TABLE UserBehavior (
   PRIMARY KEY (Id)
 ) COMMENT='用户行为表（推荐系统基础）';
 ```
+ALTER TABLE `User`
+ADD COLUMN `ThemeColor` VARCHAR(16) DEFAULT NULL
+COMMENT '用户自定义主题颜色（hex格式，如 #7C3AED）'
+AFTER `Avatar`;
 
 ------
 

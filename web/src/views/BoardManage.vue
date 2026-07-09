@@ -229,11 +229,10 @@ export default {name: 'BoardManage'}
         </el-form-item>
         <el-form-item label="状态">
           <el-switch
-              v-model="formData.status"
-              :active-value="1"
-              :inactive-value="0"
+              v-model="statusSwitch"
               active-text="正常"
               inactive-text="隐藏"
+              @change="onStatusChange"
           />
         </el-form-item>
       </el-form>
@@ -292,6 +291,12 @@ const formData = reactive({
   sortorder: 0,
   status: 1
 })
+
+// 单独用 ref 追踪开关状态，避免 el-switch 与 reactive 对象同步时丢失 falsy 值
+const statusSwitch = ref(true)
+const onStatusChange = (val) => {
+  formData.status = val ? 1 : 0
+}
 
 const formRules = {
   name: [
@@ -375,6 +380,7 @@ function handleCreate() {
   isEditing.value = false
   editingId.value = null
   resetForm()
+  statusSwitch.value = true
   dialogVisible.value = true
 }
 
@@ -387,6 +393,7 @@ function handleEdit(row) {
   formData.description = row.description || ''
   formData.sortorder = row.sortorder ?? 0
   formData.status = row.status ?? 1
+  statusSwitch.value = (row.status ?? 1) === 1
   dialogVisible.value = true
 }
 
@@ -422,7 +429,8 @@ async function handleSubmit() {
   }
   dialogLoading.value = true
   try {
-    const payload = {...formData}
+    // 使用 JSON 序列化确保 falsy 值（如 status=0）不会在展开 reactive 时丢失
+    const payload = JSON.parse(JSON.stringify(formData))
     const res = isEditing.value
         ? await updateBoard({...payload, id: editingId.value})
         : await createBoard(payload)

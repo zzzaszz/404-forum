@@ -6,6 +6,7 @@ import zzz.service.forum.domain.FavoriterecordEntity;
 import zzz.service.forum.domain.LikerecordEntity;
 import zzz.service.forum.domain.NotificationEntity;
 import zzz.service.forum.domain.ReportEntity;
+import zzz.service.forum.domain.User;
 import zzz.service.forum.domain.pojo.BoardPojo;
 import zzz.service.forum.domain.pojo.CommentPojo;
 import zzz.service.forum.domain.pojo.NotificationPojo;
@@ -15,6 +16,7 @@ import zzz.service.forum.mapper.ForumMapper;
 import zzz.service.forum.mapper.LikerecordMapper;
 import zzz.service.forum.mapper.NotificationMapper;
 import zzz.service.forum.mapper.ReportMapper;
+import zzz.service.forum.mapper.UserMapper;
 import zzz.service.forum.service.ForumService;
 import zzz.service.forum.utils.BaseBusinessException;
 import zzz.service.forum.utils.SnowflakeIdGenerator;
@@ -45,9 +47,10 @@ public class ForumServiceImpl implements ForumService {
             "#7C3AED", "#3B82F6", "#16A34A", "#EA580C", "#F59E0B", "#EF4444",
             "#0EA5E9", "#8B5CF6", "#EC4899", "#14B8A6"
     };
-    // 头像 emoji 池
+    // 头像图片池（使用前端 public/images/ 下的图片，与 pickAvatar 保持一致）
     private static final String[] AVATAR_POOL = {
-            "🦊", "🐼", "🐱", "🐧", "🦉", "🐢", "🦄", "🐙", "🦖", "🐳"
+            "/images/user1.png", "/images/user2.png", "/images/user3.png", "/images/user4.png",
+            "/images/user5.png", "/images/user6.png", "/images/user7.png", "/images/user8.png"
     };
     @Resource
     private ForumMapper forumMapper;
@@ -61,6 +64,8 @@ public class ForumServiceImpl implements ForumService {
     private NotificationMapper notificationMapper;
     @Resource
     private SnowflakeIdGenerator snowflakeIdGenerator;
+    @Resource
+    private UserMapper userMapper;
 
     private String currentUserId() {
         Long uid = UserContext.getUserId();
@@ -75,6 +80,29 @@ public class ForumServiceImpl implements ForumService {
 
     private String randomFrom(String[] pool) {
         return pool[ThreadLocalRandom.current().nextInt(pool.length)];
+    }
+
+    /** 获取当前登录用户的昵称 */
+    private String getUserNickname() {
+        Long userId = UserContext.getUserId();
+        if (userId == null) return "匿名用户";
+        User user = userMapper.selectById(userId);
+        return user != null && user.getNickname() != null ? user.getNickname() : "匿名用户";
+    }
+
+    /** 按用户 ID 稳定映射头像（与前端 pickAvatar 逻辑一致） */
+    private String pickUserAvatar(Long userId) {
+        if (userId == null) return AVATAR_POOL[0];
+        int idx = (int) (Math.abs(userId) % AVATAR_POOL.length);
+        return AVATAR_POOL[idx];
+    }
+
+    /** 获取用户主题颜色，没有则随机 */
+    private String getUserColor() {
+        Long userId = UserContext.getUserId();
+        if (userId == null) return randomFrom(COLOR_POOL);
+        User user = userMapper.selectById(userId);
+        return user != null && user.getThemeColor() != null ? user.getThemeColor() : randomFrom(COLOR_POOL);
     }
 
     @Override
@@ -138,14 +166,16 @@ public class ForumServiceImpl implements ForumService {
         PostPojo post = new PostPojo();
         post.setId(snowflakeIdGenerator.nextId());
         post.setBoardid(board.getId());
-        post.setUserid(UserContext.getUserId());
-        post.setAnonymousname(randomFrom(NAME_POOL));
-        post.setAnonymousavatar(randomFrom(AVATAR_POOL));
-        post.setAnonymouscolor(randomFrom(COLOR_POOL));
+        Long userId = UserContext.getUserId();
+        post.setUserid(userId);
+        // 使用真实用户信息，不再使用匿名随机名称
+        post.setAnonymousname(getUserNickname());
+        post.setAnonymousavatar(pickUserAvatar(userId));
+        post.setAnonymouscolor(getUserColor());
         post.setTitle(title.trim());
         post.setContent(content.trim());
         post.setContenttext(content.trim());
-        post.setImages("");
+        // Images 为 MySQL JSON 列，不设置（null）避免空字符串报错
         post.setViewcount(0L);
         post.setReplycount(0L);
         post.setLikecount(0L);
@@ -205,7 +235,8 @@ public class ForumServiceImpl implements ForumService {
         comment.setParentid(parentId == null ? 0L : parentId);
         comment.setReplyuserid(0L);
         comment.setAnonymousidentityid(null);
-        comment.setAnonymousname(randomFrom(NAME_POOL));
+        // 使用真实用户信息，不再使用匿名随机名称
+        comment.setAnonymousname(getUserNickname());
         comment.setContent(content.trim());
         comment.setLikecount(0L);
         comment.setReplycount(0L);

@@ -59,4 +59,16 @@ public interface UserMapper {
      * 更新昵称/角色
      */
     int updateProfile(@Param("id") Long id, @Param("nickname") String nickname, @Param("role") Integer role);
+
+    /**
+     * 更新用户主题颜色
+     */
+    int updateThemeColor(@Param("id") Long id, @Param("themeColor") String themeColor);
+
+    /**
+     * 更新用户个人资料（昵称、签名、主题颜色）
+     */
+    int updateUserProfile(@Param("id") Long id,
+                          @Param("nickname") String nickname,
+                          @Param("themeColor") String themeColor);
 }

@@ -123,7 +123,8 @@
         <div class="header-right">
           <el-dropdown>
             <span class="user-dropdown" tabindex="0">
-              <el-avatar :size="32" :src="userAvatar" class="user-avatar">
+              <el-avatar :size="32" class="user-avatar">
+                {{ userInitial }}
               </el-avatar>
               <span class="user-name">{{ userName }}</span>
               <el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -175,7 +176,7 @@ import {
   UserFilled,
   VideoPlay
 } from '@element-plus/icons-vue'
-import {getBoardPageList, logout, pickAvatar} from '@/api'
+import {getBoardPageList, logout} from '@/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -207,10 +208,10 @@ const allBoards = ref([])
 
 const topicMenuItems = computed(() => {
   const items = []
-  // 固定分类优先
+  // 固定分类优先（固定分类始终展示）
   for (const code of FIXED_CODES) {
     const cfg = FIXED_TOPIC_CONFIG[code]
-    const board = allBoards.value.find(b => b.code === code)
+    const board = allBoards.value.find(b => b.code === code && b.status === 1)
     items.push({
       index: cfg.index,
       name: board ? board.name : cfg.name,
@@ -218,9 +219,9 @@ const topicMenuItems = computed(() => {
       code
     })
   }
-  // 其他 API 板块
+  // 其他 API 板块（只显示状态=1 的正常板块，隐藏板块不出现在导航中）
   for (const board of allBoards.value) {
-    if (!FIXED_CODES.includes(board.code)) {
+    if (!FIXED_CODES.includes(board.code) && board.status === 1) {
       items.push({
         index: `/topic/board/${board.code}`,
         name: board.name,
@@ -278,15 +279,6 @@ const userName = computed(() => {
 
 const userInitial = computed(() => {
   return userName.value.charAt(0).toUpperCase()
-})
-
-const userAvatar = computed(() => {
-  try {
-    const info = JSON.parse(localStorage.getItem('userInfo') || '{}')
-    return pickAvatar(info.userId)
-  } catch {
-    return pickAvatar(null)
-  }
 })
 
 const currentMenu = computed(() => {

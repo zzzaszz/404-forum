@@ -12,6 +12,7 @@
         <result column="PasswordHash" property="passwordHash"/>
         <result column="Nickname" property="nickname"/>
         <result column="Avatar" property="avatar"/>
+        <result column="ThemeColor" property="themeColor"/>
         <result column="Status" property="status"/>
         <result column="Role" property="role"/>
         <result column="LastLoginIp" property="lastLoginIp"/>
@@ -41,9 +42,9 @@
     </select>
 
     <insert id="insert">
-        INSERT INTO User (Id, DeviceId, Username, PasswordHash, Nickname, Avatar, Status, Role, LastLoginIp,
+        INSERT INTO User (Id, DeviceId, Username, PasswordHash, Nickname, Avatar, ThemeColor, Status, Role, LastLoginIp,
                           LastLoginAt, Deleted)
-        VALUES (#{id}, #{deviceId}, #{username}, #{passwordHash}, #{nickname}, #{avatar}, #{status}, #{role},
+        VALUES (#{id}, #{deviceId}, #{username}, #{passwordHash}, #{nickname}, #{avatar}, #{themeColor}, #{status}, #{role},
                 #{lastLoginIp}, #{lastLoginAt}, #{deleted})
     </insert>
 
@@ -130,6 +131,23 @@
         <set>
             <if test="nickname != null">Nickname = #{nickname},</if>
             <if test="role != null">Role = #{role},</if>
+            UpdatedAt = NOW()
+        </set>
+        WHERE Id = #{id}
+    </update>
+
+    <update id="updateThemeColor">
+        UPDATE User
+        SET ThemeColor = #{themeColor},
+            UpdatedAt = NOW()
+        WHERE Id = #{id}
+    </update>
+
+    <update id="updateUserProfile">
+        UPDATE User
+        <set>
+            <if test="nickname != null">Nickname = #{nickname},</if>
+            <if test="themeColor != null">ThemeColor = #{themeColor},</if>
             UpdatedAt = NOW()
         </set>
         WHERE Id = #{id}

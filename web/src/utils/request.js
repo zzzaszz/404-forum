@@ -51,6 +51,15 @@ async function doRefreshToken() {
       if (data.refreshToken) {
         localStorage.setItem('refreshToken', data.refreshToken)
       }
+      // 同步更新 userInfo 中的主题颜色等字段
+      try {
+        const storedInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+        if (data.nickname) storedInfo.nickname = data.nickname
+        if (data.avatar) storedInfo.avatar = data.avatar
+        if (data.themeColor) storedInfo.themeColor = data.themeColor
+        if (data.role !== undefined) storedInfo.role = data.role
+        localStorage.setItem('userInfo', JSON.stringify(storedInfo))
+      } catch { /* ignore */ }
       return true
     }
     return false

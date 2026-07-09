@@ -73,7 +73,7 @@ public class PostServiceImpl implements PostService {
         if (postPojo.getTitle() == null) postPojo.setTitle("");
         if (postPojo.getContent() == null) postPojo.setContent("");
         if (postPojo.getContenttext() == null) postPojo.setContenttext("");
-        if (postPojo.getImages() == null) postPojo.setImages("");
+        // Images 为 MySQL JSON 列，保持 null 避免空字符串报错
         if (postPojo.getIstop() == null) postPojo.setIstop(0);
         if (postPojo.getIsessence() == null) postPojo.setIsessence(0);
         if (postPojo.getStatus() == null) postPojo.setStatus(0);

@@ -64,27 +64,23 @@
             </template>
 
             <el-form :model="profileForm" label-width="100px" class="profile-form">
-              <el-form-item label="匿名昵称">
-                <el-input v-model="profileForm.nickname" placeholder="你的匿名昵称" maxlength="20" />
+              <el-form-item label="昵称">
+                <el-input v-model="profileForm.nickname" placeholder="你的昵称" maxlength="20" />
               </el-form-item>
-              <el-form-item label="匿名ID">
-                <el-input v-model="userInfo.anonymousId" disabled />
-                <div class="form-tip">匿名ID由系统自动生成，无法修改</div>
-              </el-form-item>
+<!--              <el-form-item label="匿名ID">-->
+<!--                <el-input v-model="userInfo.anonymousId" disabled />-->
+<!--                <div class="form-tip">匿名ID由系统自动生成，无法修改</div>-->
+<!--              </el-form-item>-->
               <el-form-item label="个性签名">
                 <el-input v-model="profileForm.signature" type="textarea" :rows="3" placeholder="写一句话介绍自己" maxlength="100" show-word-limit />
               </el-form-item>
-              <el-form-item label="头像颜色">
-                <div class="avatar-colors">
-                  <div
-                    v-for="color in avatarColors"
-                    :key="color.value"
-                    class="color-option"
-                    :class="{ active: profileForm.avatarColor === color.value }"
-                    :style="{ background: color.gradient }"
-                    @click="profileForm.avatarColor = color.value"
-                  ></div>
+              <el-form-item label="主题颜色">
+                <div class="theme-color-picker">
+                  <el-color-picker v-model="profileForm.themeColor" @change="onThemeColorChange" />
+                  <span class="theme-color-value">{{ profileForm.themeColor }}</span>
+                  <el-button size="small" text type="primary" @click="resetThemeColor">恢复默认</el-button>
                 </div>
+                <div class="form-tip">自定义主题颜色将应用于头像、侧边栏等界面元素</div>
               </el-form-item>
             </el-form>
 
@@ -206,6 +202,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
+import { updateProfile } from '@/api'
 
 const activeTab = ref('profile')
 
@@ -227,17 +224,11 @@ const userStats = ref({
 const profileForm = ref({
   nickname: '',
   signature: '',
-  avatarColor: 'purple'
+  avatarColor: 'purple',
+  themeColor: '#7C3AED'
 })
 
-// 头像颜色选项
-const avatarColors = [
-  { value: 'purple', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
-  { value: 'blue', gradient: 'linear-gradient(135deg, #3498db, #2980b9)' },
-  { value: 'green', gradient: 'linear-gradient(135deg, #27ae60, #2ecc71)' },
-  { value: 'orange', gradient: 'linear-gradient(135deg, #f39c12, #e74c3c)' },
-  { value: 'pink', gradient: 'linear-gradient(135deg, #f64f59, #c471ed)' }
-]
+const DEFAULT_THEME_COLOR = '#7C3AED'
 
 // 隐私设置
 const privacySettings = ref({
@@ -275,6 +266,9 @@ const loadUserInfo = () => {
       loginTime: storedInfo.loginTime || ''
     }
     profileForm.value.nickname = userInfo.value.nickname
+    profileForm.value.signature = storedInfo.signature || ''
+    profileForm.value.avatarColor = storedInfo.avatarColor || 'purple'
+    profileForm.value.themeColor = storedInfo.themeColor || DEFAULT_THEME_COLOR
   } catch (error) {
     ElMessage.error('获取用户信息失败')
   }
@@ -285,8 +279,44 @@ const handleMenuSelect = (index) => {
   activeTab.value = index
 }
 
+/** 主题颜色变化时实时预览 */
+const onThemeColorChange = (color) => {
+  if (color) {
+    applyThemeColor(color)
+  }
+}
+
+/** 恢复默认主题颜色 */
+const resetThemeColor = () => {
+  profileForm.value.themeColor = DEFAULT_THEME_COLOR
+  applyThemeColor(DEFAULT_THEME_COLOR)
+}
+
+/** 将主题颜色应用到全局 CSS 变量 */
+const applyThemeColor = (color) => {
+  const root = document.documentElement
+  root.style.setProperty('--accent-color', color)
+  root.style.setProperty('--accent-dark', adjustColor(color, -20))
+  root.style.setProperty('--accent-light', adjustColor(color, 20))
+  root.style.setProperty('--sidebar-active-bg', color)
+}
+
+/** 简单的颜色明度调整（hex 颜色 ±amount） */
+const adjustColor = (hex, amount) => {
+  if (!hex || !hex.startsWith('#')) return hex
+  let r, g, b
+  const num = parseInt(hex.slice(1), 16)
+  r = (num >> 16) & 0xff
+  g = (num >> 8) & 0xff
+  b = num & 0xff
+  r = Math.max(0, Math.min(255, r + amount))
+  g = Math.max(0, Math.min(255, g + amount))
+  b = Math.max(0, Math.min(255, b + amount))
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
+}
+
 // 保存个人资料
-const saveProfile = () => {
+const saveProfile = async () => {
   if (!profileForm.value.nickname || profileForm.value.nickname.length < 2) {
     ElMessage.warning('昵称至少需要2个字符')
     return
@@ -297,7 +327,22 @@ const saveProfile = () => {
   storedInfo.nickname = profileForm.value.nickname
   storedInfo.signature = profileForm.value.signature
   storedInfo.avatarColor = profileForm.value.avatarColor
+  storedInfo.themeColor = profileForm.value.themeColor
   localStorage.setItem('userInfo', JSON.stringify(storedInfo))
+
+  // 应用主题颜色
+  applyThemeColor(profileForm.value.themeColor)
+
+  // 持久化到后端
+  try {
+    await updateProfile({
+      nickname: profileForm.value.nickname,
+      themeColor: profileForm.value.themeColor
+    })
+  } catch {
+    // 后端保存失败仅警告，不影响本地使用
+    ElMessage.warning('部分设置未能同步到服务器，已保存在本地')
+  }
 
   userInfo.value.nickname = profileForm.value.nickname
   ElMessage.success('资料已更新')
@@ -310,6 +355,11 @@ const formatTime = (date) => {
 
 onMounted(() => {
   loadUserInfo()
+  // 初始化时应用已保存的主题颜色
+  const storedInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  if (storedInfo.themeColor) {
+    applyThemeColor(storedInfo.themeColor)
+  }
 })
 </script>
 
@@ -433,27 +483,17 @@ onMounted(() => {
 .profile-form { padding: 16px 0; }
 .form-tip { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
-.avatar-colors {
+/* 主题颜色选择器 */
+.theme-color-picker {
   display: flex;
+  align-items: center;
   gap: 12px;
 }
 
-.color-option {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: transform 0.2s;
-  border: 2px solid transparent;
-}
-
-.color-option:hover {
-  transform: scale(1.1);
-}
-
-.color-option.active {
-  border-color: var(--text-primary);
-  transform: scale(1.1);
+.theme-color-value {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-family: monospace;
 }
 
 /* 隐私设置 */

@@ -363,38 +363,45 @@ watch(categoryCode, () => loadTopics())
 }
 
 /* Create Topic Dialog */
-.create-form :deep(.el-input__wrapper) {
+.create-form :deep(.el-input) {
   border-radius: var(--radius-md);
-  padding: 8px 14px;
   background: var(--bg-light);
-  box-shadow: 0 0 0 1px var(--border-light) inset;
+  box-shadow: none;
   transition: all var(--transition-fast);
+  overflow: hidden;
+}
+
+.create-form :deep(.el-input__wrapper) {
+  border-radius: 0 !important;
+  padding: 8px 14px;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .create-form :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px var(--primary-light) inset;
+  box-shadow: none !important;
 }
 
-.create-form :deep(.el-input__wrapper.is-focus) {
+.create-form :deep(.el-input.is-focus) {
   background: var(--bg-white);
-  box-shadow: 0 0 0 2px var(--primary-color) inset;
+  box-shadow: none;
 }
 
 .create-form :deep(.el-textarea__inner) {
   border-radius: var(--radius-md);
   padding: 10px 14px;
   background: var(--bg-light);
-  box-shadow: 0 0 0 1px var(--border-light) inset;
+  box-shadow: none;
   transition: all var(--transition-fast);
 }
 
 .create-form :deep(.el-textarea__inner:hover) {
-  box-shadow: 0 0 0 1px var(--primary-light) inset;
+  box-shadow: none;
 }
 
 .create-form :deep(.el-textarea__inner:focus) {
   background: var(--bg-white);
-  box-shadow: 0 0 0 2px var(--primary-color) inset;
+  box-shadow: none;
 }
 
 .create-form :deep(.el-select .el-input__wrapper) {

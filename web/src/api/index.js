@@ -82,6 +82,13 @@ export function updatePassword(data) {
   return request({url: '/api/auth/updatePassword', method: 'post', data})
 }
 
+/**
+ * 更新当前用户个人资料（昵称、主题颜色）
+ */
+export function updateProfile(data) {
+  return request({url: '/api/auth/updateProfile', method: 'post', data})
+}
+
 // ============ 板块管理（通用 CRUD） ============
 const BOARD_URL = '/board'
 
@@ -234,6 +241,13 @@ export function pickAvatar(id) {
   return AVATAR_POOL[idx]
 }
 
+/** 判断是否为 emoji 字符（老数据兼容，emoji 不作文头像 URL 使用） */
+function isEmoji(str) {
+  if (!str || str.startsWith('/')) return false
+  // emoji 通常为 1-4 字节的 Unicode 字符，不以 / 或 http 开头
+  return !str.startsWith('http') && str.length <= 4
+}
+
 /** 将帖子 Pojo 映射为前端话题卡片对象 */
 export function mapTopic(p) {
   if (!p) return null
@@ -244,8 +258,11 @@ export function mapTopic(p) {
     boardName: p.boardname || '',
     title: p.title || '',
     content: p.content || '',
-    author: p.anonymousname || '匿名用户',
-    avatar: p.anonymousavatar || pickAvatar(p.id),
+    author: p.anonymousname || '用户',
+    // 头像优先使用后端路径；emoji 等老数据回退到 pickAvatar
+    avatar: (p.anonymousavatar && !isEmoji(p.anonymousavatar))
+        ? p.anonymousavatar
+        : pickAvatar(p.id),
     color: p.anonymouscolor || '#7C3AED',
     views: p.viewcount || 0,
     comments: p.replycount || 0,
@@ -266,8 +283,11 @@ export function mapComment(c) {
   return {
     id: c.id,
     postId: c.postid,
-    author: c.anonymousname || '匿名用户',
-    avatar: pickAvatar(c.id),
+    author: c.anonymousname || '用户',
+    // 头像优先使用后端路径；emoji 等老数据回退到 pickAvatar
+    avatar: (c.anonymousavatar && !isEmoji(c.anonymousavatar))
+        ? c.anonymousavatar
+        : pickAvatar(c.id),
     color: c.anonymouscolor || '#7C3AED',
     content: c.content || '',
     likes: c.likecount || 0,
