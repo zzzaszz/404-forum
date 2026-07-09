@@ -247,20 +247,9 @@ html, body {
   color: var(--text-primary);
 }
 
+/* ============ Input 圆角统一 ============ */
 .el-input__wrapper {
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-color) !important;
-  transition: all var(--transition-fast);
-  box-shadow: none !important;
-}
-
-.el-input__wrapper:hover {
-  box-shadow: none !important;
-}
-
-.el-input__wrapper.is-focus {
-  outline: none !important;
-  box-shadow: none !important;
 }
 
 /* 分页样式优化 */
@@ -447,10 +436,10 @@ html, body {
    焦点管理 - 无障碍访问
    ============================================= */
 
-/* 仅对键盘可交互元素显示焦点环，避免点击时出现紫色边框 */
+/* 仅对可交互元素显示焦点环，排除输入框内部 input（边框由 el-input__wrapper 控制） */
 a:focus-visible,
 button:focus-visible,
-input:focus-visible,
+input:not(.el-input__inner):focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 [tabindex]:focus-visible,
@@ -459,6 +448,12 @@ select:focus-visible,
   outline: 2px solid var(--focus-ring-color);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+/* EP 输入框内部元素由 Element Plus 管理边框，不画外层 outline */
+.el-input__inner:focus-visible,
+.el-textarea__inner:focus-visible {
+  outline: none;
 }
 
 /* 全局去除默认 outline，防止元素点击选中时出现紫色边框 */

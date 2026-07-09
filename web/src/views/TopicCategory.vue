@@ -363,28 +363,26 @@ watch(categoryCode, () => loadTopics())
 }
 
 /* Create Topic Dialog */
+/* 创建表单：外层统一包裹，内层透明 */
 .create-form :deep(.el-input) {
   border-radius: var(--radius-md);
   background: var(--bg-light);
+  border: 1px solid var(--border-color);
   box-shadow: none;
-  transition: all var(--transition-fast);
   overflow: hidden;
-}
-
-.create-form :deep(.el-input__wrapper) {
-  border-radius: 0 !important;
-  padding: 8px 14px;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-.create-form :deep(.el-input__wrapper:hover) {
-  box-shadow: none !important;
 }
 
 .create-form :deep(.el-input.is-focus) {
   background: var(--bg-white);
+  border: 1px solid var(--border-color);
   box-shadow: none;
+}
+
+.create-form :deep(.el-input__wrapper) {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 8px 14px;
 }
 
 .create-form :deep(.el-textarea__inner) {

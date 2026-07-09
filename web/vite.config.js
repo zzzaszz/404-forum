@@ -333,6 +333,10 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
+      "/ws": {
+        target: "ws://localhost:10610",
+        ws: true,
+      },
     },
   },
 });

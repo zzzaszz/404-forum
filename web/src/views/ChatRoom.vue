@@ -5,26 +5,49 @@ export default { name: 'ChatRoom' }
 <template>
   <div class="chat-room">
     <div class="chat-header">
-      <h2>公共聊天室</h2>
+      <div class="header-left">
+        <h2>{{ currentRoomName }}</h2>
+        <el-select v-model="currentRoom" size="small" style="width:160px" @change="switchRoom">
+          <el-option
+            v-for="r in roomList"
+            :key="r.roomId"
+            :label="`${r.name || '房间' + r.roomId} (${r.online}/${r.max})`"
+            :value="r.roomId"
+            :disabled="r.online >= r.max"
+          />
+        </el-select>
+      </div>
       <div class="online-info">
-        <el-icon><UserFilled /></el-icon>
-        <span>{{ onlineCount }} 人在线</span>
+        <span class="online-dot"></span>
+        <span>{{ onlineCount }} / {{ maxPerRoom }} 人在线</span>
       </div>
     </div>
 
-    <div ref="messageContainer" class="chat-messages">
-      <div v-for="msg in messages" :key="msg.id" class="message">
-        <div class="msg-avatar" :style="{ background: msg.color }">
-          {{ msg.nickname.charAt(0) }}
-        </div>
-        <div class="msg-body">
-          <div class="msg-header">
-            <span class="msg-nickname">{{ msg.nickname }}</span>
-            <span class="msg-time">{{ msg.time }}</span>
+    <!-- 连接中 / 断线 -->
+    <div v-if="!connected" class="chat-status">
+      <el-icon :size="40" class="is-loading"><Loading /></el-icon>
+      <p>连接中...</p>
+      <span class="status-sub">正在建立实时通信</span>
+    </div>
+
+    <!-- 消息列表 -->
+    <div v-else ref="msgBox" class="chat-messages">
+      <div v-for="msg in messages" :key="msg.id" class="message" :class="{ system: msg.type !== 'chat' }">
+        <template v-if="msg.type === 'chat'">
+          <div class="msg-avatar" :style="{ background: msg.color }">{{ msg.nickname.charAt(0) }}</div>
+          <div class="msg-body">
+            <div class="msg-header">
+              <span class="msg-nickname">{{ msg.nickname }}</span>
+              <span class="msg-time">{{ msg.time }}</span>
+            </div>
+            <div class="msg-content">{{ msg.content }}</div>
           </div>
-          <div class="msg-content">{{ msg.content }}</div>
-        </div>
+        </template>
+        <template v-else>
+          <div class="system-msg">{{ msg.content }}</div>
+        </template>
       </div>
+      <div v-if="messages.length === 0" class="empty-hint">暂无消息，来打个招呼吧</div>
     </div>
 
     <div class="chat-input">
@@ -33,10 +56,11 @@ export default { name: 'ChatRoom' }
         placeholder="输入消息..."
         size="large"
         clearable
-        @keydown.enter.prevent="sendMessage"
+        :disabled="!connected"
+        @keydown.enter.prevent="sendMsg"
       >
         <template #append>
-          <el-button type="primary" @click="sendMessage">发送</el-button>
+          <el-button type="primary" :disabled="!connected" @click="sendMsg">发送</el-button>
         </template>
       </el-input>
     </div>
@@ -44,67 +68,133 @@ export default { name: 'ChatRoom' }
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { Loading } from '@element-plus/icons-vue'
+import dayjs from 'dayjs'
 
-const onlineCount = ref(42)
+const msgBox = ref(null)
 const inputText = ref('')
-const messageContainer = ref(null)
+const messages = ref([])
+const connected = ref(false)
+const currentRoom = ref(1)
+const onlineCount = ref(0)
+const maxPerRoom = ref(200)
+const roomList = ref([])
 
-const mockUsers = [
-  { nickname: '匿名#A3F', color: '#7C3AED' },
-  { nickname: '匿名#B72', color: '#3B82F6' },
-  { nickname: '匿名#C91', color: '#16A34A' },
-  { nickname: '匿名#D45', color: '#EA580C' },
-  { nickname: '匿名#E28', color: '#F59E0B' },
-  { nickname: '匿名用户', color: '#64748B' }
-]
+let ws = null
+let reconnectTimer = null
+const COLORS = ['#7C3AED','#3B82F6','#16A34A','#EA580C','#F59E0B','#EF4444','#0EA5E9','#8B5CF6','#EC4899','#14B8A6']
 
-const mockMessages = [
-  { content: '大家好，今天天气不错', time: '14:20' },
-  { content: '有人玩过最近那个新游戏吗？', time: '14:21' },
-  { content: '分享一下，今天看到了一个很有意思的开源项目', time: '14:22' },
-  { content: '周末有人想去爬山吗？', time: '14:23' },
-  { content: '推荐一本好书，叫《黑客与画家》', time: '14:24' },
-  { content: '有没有前端开发的小伙伴，聊聊 Vue3 的使用体验', time: '14:25' },
-  { content: '今天面试挂了，求安慰', time: '14:26' },
-  { content: '分享一下今天中午吃到的美食', time: '14:27' }
-]
+const currentRoomName = computed(() => {
+  const r = roomList.value.find(item => item.roomId === currentRoom.value)
+  return r ? (r.name || '房间' + r.roomId) : '聊天室'
+})
 
-const messages = ref(mockMessages.map((m, i) => {
-  const user = mockUsers[i % mockUsers.length]
-  return { id: i + 1, ...m, nickname: user.nickname, color: user.color }
-}))
-
-function scrollToBottom() {
-  nextTick(() => {
-    if (messageContainer.value) {
-      messageContainer.value.scrollTop = messageContainer.value.scrollHeight
-    }
-  })
+function getMyNickname() {
+  try {
+    const u = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    return u.nickname || '匿名用户'
+  } catch { return '匿名用户' }
 }
 
-function sendMessage() {
+function getToken() {
+  return localStorage.getItem('token') || ''
+}
+
+function connect() {
+  if (ws && ws.readyState === WebSocket.OPEN) return
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const url = `${protocol}//${location.host}/ws/chat?token=${encodeURIComponent(getToken())}&roomId=${currentRoom.value}`
+  console.log('[WS] 正在连接:', url)
+
+  try { ws = new WebSocket(url) }
+  catch (e) {
+    console.error('[WS] 连接失败:', e.message)
+    scheduleReconnect()
+    return
+  }
+
+  ws.onopen = () => {
+    console.log('[WS] 连接成功, roomId:', currentRoom.value)
+    connected.value = true
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+  }
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data)
+      if (msg.type === 'roomList') {
+        const list = JSON.parse(msg.content)
+        console.log('[WS] 收到房间列表:', list)
+        roomList.value = list
+        const cur = list.find(r => r.roomId === currentRoom.value)
+        if (cur) { onlineCount.value = cur.online; maxPerRoom.value = cur.max }
+        return
+      }
+      if (msg.roomId !== currentRoom.value && msg.type !== 'system') return
+      if (msg.type === 'chat' || msg.type === 'join' || msg.type === 'leave') {
+        messages.value.push({
+          id: Date.now() + Math.random(),
+          type: msg.type,
+          nickname: msg.nickname || '系统',
+          content: msg.content || '',
+          time: dayjs(msg.timestamp).format('HH:mm'),
+          color: msg.type === 'chat' ? COLORS[Math.abs((msg.nickname || '').length) % COLORS.length] : ''
+        })
+        if (messages.value.length > 300) messages.value = messages.value.slice(-200)
+        scrollBottom()
+      }
+      if (msg.onlineCount != null) onlineCount.value = msg.onlineCount
+    } catch {}
+  }
+
+  ws.onclose = (e) => {
+    console.log('[WS] 连接断开, code:', e.code, 'reason:', e.reason)
+    connected.value = false
+    scheduleReconnect()
+  }
+  ws.onerror = (e) => {
+    console.error('[WS] 连接错误')
+    connected.value = false
+    ws?.close()
+  }
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return
+  console.log('[WS] 3秒后自动重连...')
+  reconnectTimer = setTimeout(() => { reconnectTimer = null; connect() }, 3000)
+}
+
+function switchRoom(roomId) {
+  console.log('[WS] 切换房间:', currentRoom.value, '->', roomId)
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'switch', newRoomId: roomId }))
+    messages.value = []
+  } else {
+    currentRoom.value = roomId
+    connect()
+  }
+}
+
+function sendMsg() {
   const text = inputText.value.trim()
-  if (!text) return
-
-  const now = new Date()
-  const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-  const nickname = userInfo.nickname || '匿名用户'
-
-  messages.value.push({
-    id: Date.now(),
-    nickname,
-    content: text,
-    time,
-    color: '#7C3AED'
-  })
+  if (!text || !ws || ws.readyState !== WebSocket.OPEN) return
+  ws.send(JSON.stringify({ type: 'chat', content: text }))
   inputText.value = ''
-  scrollToBottom()
 }
 
-onMounted(() => {
-  scrollToBottom()
+function scrollBottom() {
+  nextTick(() => {
+    if (msgBox.value) msgBox.value.scrollTop = msgBox.value.scrollHeight
+  })
+}
+
+onMounted(() => connect())
+
+onBeforeUnmount(() => {
+  if (reconnectTimer) clearTimeout(reconnectTimer)
+  if (ws) { ws.onclose = null; ws.close() }
 })
 </script>
 
@@ -125,6 +215,13 @@ onMounted(() => {
   justify-content: space-between;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-light);
+  gap: 8px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .chat-header h2 {
@@ -132,85 +229,93 @@ onMounted(() => {
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+  white-space: nowrap;
 }
 
 .online-info {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 12px;
   color: var(--text-secondary);
 }
 
+.online-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--success-color);
+  border-radius: 50%;
+}
+
+/* ====== 连接状态（居中大屏） ====== */
+.chat-status {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  gap: 12px;
+}
+
+.chat-status p {
+  font-size: 16px;
+  margin: 0;
+  font-weight: 500;
+}
+
+.status-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ====== 消息区 ====== */
 .chat-messages {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
-.message {
-  display: flex;
-  gap: 10px;
+.message { display: flex; gap: 10px; }
+.message.system { justify-content: center; }
+
+.system-msg {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-light);
+  padding: 4px 12px;
+  border-radius: 10px;
 }
+
+.empty-hint { margin: auto; font-size: 13px; color: var(--text-muted); }
 
 .msg-avatar {
-  width: 34px;
-  height: 34px;
+  width: 34px; height: 34px;
   border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600;
+  color: #fff; flex-shrink: 0;
 }
 
-.msg-body {
-  flex: 1;
-  min-width: 0;
-}
+.msg-body { flex: 1; min-width: 0; }
 
-.msg-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 3px;
-}
+.msg-header { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
 
-.msg-nickname {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.msg-time {
-  font-size: 11px;
-  color: var(--text-muted);
-}
+.msg-nickname { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.msg-time { font-size: 11px; color: var(--text-muted); }
 
 .msg-content {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  word-break: break-word;
+  font-size: 13px; color: var(--text-secondary);
+  line-height: 1.5; word-break: break-word;
 }
 
-.chat-input {
-  padding: 12px 16px;
-  border-top: 1px solid var(--border-light);
-}
+/* ====== 输入区 ====== */
+.chat-input { padding: 12px 16px; border-top: 1px solid var(--border-light); }
 
-.chat-input :deep(.el-input__wrapper) {
-  border-radius: var(--radius-md);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .message {
-    animation: none;
-  }
+@media (max-width: 768px) {
+  .chat-header { flex-direction: column; align-items: flex-start; }
 }
 </style>

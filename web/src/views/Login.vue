@@ -303,44 +303,37 @@ onMounted(() => {
   margin: 0;
 }
 
+/* ========== 表单项：错误提示在下方，不影响输入框位置 ========== */
 .login-form :deep(.el-form-item) {
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
-.login-form :deep(.el-form-item__content) {
-  display: flex;
+/* 错误从 absolute 改为 static，放进正常流，避免和输入框重叠 */
+.login-form :deep(.el-form-item__error) {
+  position: static;
+  line-height: 20px;
+  margin-top: 4px;
+  font-size: 12px;
 }
 
-.login-form :deep(.el-input) {
-  border-radius: var(--radius-md);
-  background: var(--bg-light);
-  box-shadow: none;
-  transition: all var(--transition-fast);
-  overflow: hidden;
-}
-
+/* ========== 输入框：只覆盖背景、圆角、内边距，边框/焦点由 Element Plus 控制 ========== */
 .login-form :deep(.el-input__wrapper) {
-  border-radius: 0 !important;
+  border-radius: var(--radius-md);
   padding: 8px 14px;
-  background: transparent !important;
-  box-shadow: none !important;
+  background: var(--bg-light);
 }
 
-.login-form :deep(.el-input__wrapper:hover) {
-  box-shadow: none !important;
-}
-
-.login-form :deep(.el-input.is-focus) {
+/* focus 时仅切换背景色，边框颜色由 Element Plus 默认 */
+.login-form :deep(.el-input__wrapper.is-focus) {
   background: var(--bg-white);
-  box-shadow: none;
 }
 
 .login-form :deep(.el-input__inner) {
   font-size: 14px;
-  color: var(--text-primary);
 }
 
-.login-form :deep(.el-input__prefix .el-icon) {
+.login-form :deep(.el-input__prefix .el-icon),
+.login-form :deep(.el-input__suffix .el-icon) {
   color: var(--text-muted);
 }
 
