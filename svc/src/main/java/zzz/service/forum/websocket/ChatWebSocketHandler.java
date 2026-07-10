@@ -86,6 +86,15 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         try {
             JSONObject json = JSON.parseObject(message.getPayload());
             String type = json.getString("type");
+
+            // 应用层心跳：前端发 ping，后端回 pong（无需加入房间即可响应）
+            if ("ping".equals(type)) {
+                ChatMessage pong = new ChatMessage();
+                pong.setType("pong");
+                sendMessage(session, pong);
+                return;
+            }
+
             Integer roomId = (Integer) session.getAttributes().get("roomId");
             String nickname = (String) session.getAttributes().get("nickname");
 

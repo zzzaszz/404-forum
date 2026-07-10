@@ -172,6 +172,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         String newAccessToken = JwtUtils.generateAccessToken(userId, user.getDeviceId());
+        // 刷新后必须更新 Redis 中的 access token，否则 AuthAspect 仍按旧值校验导致 401 死循环
+        redisService.setCacheObject(ACCESS_TOKEN_KEY_PREFIX + userId, newAccessToken, 30L, TimeUnit.MINUTES);
 
         return LoginResponse.builder()
                 .accessToken(newAccessToken)

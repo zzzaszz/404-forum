@@ -132,6 +132,78 @@ public interface ForumMapper {
     long countUnreadNotifications(@Param("userId") String userId);
 
     /**
+     * 与当前用户相关的所有私信（收或发），用于聚合会话列表。
+     */
+    List<NotificationPojo> findConversations(@Param("me") String me);
+
+    /**
+     * 与某用户的双向私信历史（按时间正序）。
+     */
+    List<NotificationPojo> findPrivateMessages(@Param("me") String me,
+                                               @Param("other") String other);
+
+    /**
+     * 标记与某用户的会话为已读（对方发给我的未读私信）。
+     */
+    int markConversationRead(@Param("me") String me, @Param("other") String other);
+
+    /**
+     * 查询帖子所属用户ID（归属校验用）
+     */
+    Long findPostOwner(@Param("id") String id);
+
+    /**
+     * 软删除帖子（Deleted=1）
+     */
+    int softDeletePost(@Param("id") String id);
+
+    /**
+     * 查询评论所属用户ID（归属校验用）
+     */
+    Long findCommentOwner(@Param("id") String id);
+
+    /**
+     * 软删除评论（Status=0）
+     */
+    int softDeleteComment(@Param("id") String id);
+
+    /**
+     * 我的发帖列表
+     */
+    List<PostPojo> findTopicsByUser(@Param("userId") String userId,
+                                    @Param("offset") int offset,
+                                    @Param("pageSize") int pageSize);
+
+    /**
+     * 我的发帖总数
+     */
+    long countTopicsByUser(@Param("userId") String userId);
+
+    /**
+     * 我的评论列表（含所属帖子标题）
+     */
+    List<Map<String, Object>> findCommentsByUser(@Param("userId") String userId,
+                                                 @Param("offset") int offset,
+                                                 @Param("pageSize") int pageSize);
+
+    /**
+     * 我的评论总数
+     */
+    long countCommentsByUser(@Param("userId") String userId);
+
+    /**
+     * 我的获赞总数（帖子点赞数 + 评论点赞数）
+     */
+    long sumUserLikes(@Param("userId") String userId);
+
+    /**
+     * 我的获赞内容（被赞的帖子/评论）
+     */
+    List<Map<String, Object>> findLikedByUser(@Param("userId") String userId,
+                                              @Param("offset") int offset,
+                                              @Param("pageSize") int pageSize);
+
+    /**
      * 新增通知
      */
     int insertNotification(NotificationPojo notification);

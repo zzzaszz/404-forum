@@ -175,6 +175,13 @@ function showUserDetail(user, event) {
 
 let ws = null
 let reconnectTimer = null
+let heartbeatTimer = null
+let heartbeatTimeout = null
+let reconnectAttempts = 0
+let restPollTimer = null
+const MAX_RECONNECT_ATTEMPTS = 5
+const HEARTBEAT_INTERVAL = 30000  // 30s 发一次心跳
+const HEARTBEAT_TIMEOUT = 10000   // 10s 未收到 pong 视为断开
 const COLORS = ['#7C3AED','#3B82F6','#16A34A','#EA580C','#F59E0B','#EF4444','#0EA5E9','#8B5CF6','#EC4899','#14B8A6']
 
 const currentRoomName = computed(() => {
@@ -212,14 +219,17 @@ function joinRoom(room) {
 }
 
 function leaveRoom() {
+  stopHeartbeat()
+  stopRestPolling()
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+  reconnectAttempts = 0
   if (ws) { ws.onclose = null; ws.close(); ws = null }
   connected.value = false; joined.value = false; messages.value = []
-  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
 }
 
-// ====== WebSocket ======
+// ====== WebSocket 连接 + 心跳 + 指数退避重连 ======
 function connect() {
-  if (ws && ws.readyState === WebSocket.OPEN) return
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   const url = `${protocol}//${location.host}/ws/chat?token=${encodeURIComponent(getToken())}&roomId=${currentRoom.value}`
   console.log('[WS] 连接:', url)
@@ -227,11 +237,16 @@ function connect() {
 
   ws.onopen = () => {
     console.log('[WS] 已连接'); connected.value = true
+    reconnectAttempts = 0
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    stopRestPolling()
+    startHeartbeat()
   }
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data)
+      // 心跳响应
+      if (msg.type === 'pong') { resetHeartbeatTimeout(); return }
       if (msg.type === 'roomList') {
         const list = JSON.parse(msg.content)
         roomList.value = list
@@ -259,13 +274,75 @@ function connect() {
       if (msg.onlineCount != null) onlineCount.value = msg.onlineCount
     } catch {}
   }
-  ws.onclose = (e) => { console.log('[WS] 断开'); connected.value = false; scheduleReconnect() }
-  ws.onerror = () => { connected.value = false; ws?.close() }
+  ws.onclose = (e) => {
+    console.log('[WS] 断开, code:', e.code)
+    connected.value = false
+    stopHeartbeat()
+    scheduleReconnect()
+  }
+  ws.onerror = () => {
+    connected.value = false
+    stopHeartbeat()
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      try { ws.close() } catch {}
+    }
+  }
 }
 
+/** 指数退避重连；超过最大次数后降级为 REST 轮询房间列表 */
 function scheduleReconnect() {
   if (reconnectTimer) return
-  reconnectTimer = setTimeout(() => { reconnectTimer = null; connect() }, 3000)
+  reconnectAttempts++
+  if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+    console.log('[WS] 重连次数耗尽，降级为 REST 轮询')
+    startRestPolling()
+    return
+  }
+  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000)
+  console.log(`[WS] ${delay / 1000}s 后第 ${reconnectAttempts} 次重连`)
+  reconnectTimer = setTimeout(() => { reconnectTimer = null; connect() }, delay)
+}
+
+/** 降级：每 15s 通过 REST API 拉取房间列表和在线用户 */
+function startRestPolling() {
+  if (restPollTimer) return
+  loadRoomList()
+  restPollTimer = setInterval(loadRoomList, 15000)
+}
+
+function stopRestPolling() {
+  if (restPollTimer) { clearInterval(restPollTimer); restPollTimer = null }
+}
+
+// ====== 心跳 ======
+function startHeartbeat() {
+  stopHeartbeat()
+  heartbeatTimer = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'ping' }))
+    }
+    resetHeartbeatTimeout()
+  }, HEARTBEAT_INTERVAL)
+}
+
+function resetHeartbeatTimeout() {
+  if (heartbeatTimeout) clearTimeout(heartbeatTimeout)
+  heartbeatTimeout = setTimeout(() => {
+    console.log('[WS] 心跳超时，主动断开')
+    if (ws) {
+      ws.onclose = null  // 避免触发 scheduleReconnect 重复
+      try { ws.close() } catch {}
+      ws = null
+    }
+    connected.value = false
+    stopHeartbeat()
+    scheduleReconnect()
+  }, HEARTBEAT_TIMEOUT)
+}
+
+function stopHeartbeat() {
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null }
+  if (heartbeatTimeout) { clearTimeout(heartbeatTimeout); heartbeatTimeout = null }
 }
 
 function switchRoom(roomId) {
@@ -351,15 +428,40 @@ async function loadFollowList() {
   } catch {}
 }
 
+/** 彻底销毁 WS 及所有定时器（组件卸载时调用） */
+function destroyWs() {
+  stopHeartbeat()
+  stopRestPolling()
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+  reconnectAttempts = 0
+  if (ws) { ws.onclose = null; ws.close(); ws = null }
+  connected.value = false
+}
+
 onMounted(() => {
   loadRoomList()
   loadFollowList()
 })
 
+// keep-alive：切回时检查连接状态，若断开则尝试重连
+onActivated(() => {
+  if (joined.value && (!ws || ws.readyState !== WebSocket.OPEN)) {
+    reconnectAttempts = 0
+    stopRestPolling()
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    connect()
+  }
+})
+
+// keep-alive：切走时暂停心跳（保持 WS 连接，避免后台消耗）
+onDeactivated(() => {
+  stopHeartbeat()
+  stopRestPolling()
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+})
+
 onBeforeUnmount(() => {
-  // keep-alive 时不会触发，只有真正销毁才断开
-  if (reconnectTimer) clearTimeout(reconnectTimer)
-  if (ws) { ws.onclose = null; ws.close(); ws = null }
+  destroyWs()
 })
 </script>
 
@@ -403,6 +505,7 @@ onBeforeUnmount(() => {
 .chat-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 16px; border-bottom: 1px solid var(--border-light); gap: 8px;
+  flex-shrink: 0;
 }
 .header-left { display: flex; align-items: center; gap: 8px; }
 .header-right { display: flex; align-items: center; gap: 12px; }
@@ -484,7 +587,7 @@ onBeforeUnmount(() => {
 .panel-user.self { opacity: .6; cursor: default; }
 
 /* 输入 */
-.chat-input { padding: 12px 16px; border-top: 1px solid var(--border-light); }
+.chat-input { padding: 12px 16px; border-top: 1px solid var(--border-light); flex-shrink: 0; }
 
 /* 用户浮动卡片 */
 .user-float-overlay {

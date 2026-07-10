@@ -94,25 +94,27 @@
         where Id = #{id}
     </update>
 
-    <!-- 帖子评论列表 -->
+    <!-- 帖子评论列表（按时间升序） -->
     <select id="findCommentsByPostId" resultType="zzz.service.forum.domain.pojo.CommentPojo">
-        select Id,
-               PostId,
-               UserId,
-               RootId,
-               ParentId,
-               ReplyUserId,
-               AnonymousIdentityId,
-               AnonymousName,
-               Content,
-               LikeCount,
-               ReplyCount,
-               Status,
-               CreatedAt
+        select Comment.Id,
+               Comment.PostId,
+               Comment.UserId,
+               Comment.RootId,
+               Comment.ParentId,
+               Comment.ReplyUserId,
+               Comment.AnonymousIdentityId,
+               Comment.AnonymousName,
+               Comment.Content,
+               Comment.LikeCount,
+               Comment.ReplyCount,
+               Comment.Status,
+               Comment.CreatedAt,
+               ru.Nickname as replyusername
         from Comment
-        where PostId = #{postId}
-          and Status = 1
-        order by CreatedAt asc
+        left join User ru on ru.Id = Comment.ReplyUserId and ru.Deleted = 0
+        where Comment.PostId = #{postId}
+          and Comment.Status = 1
+        order by Comment.CreatedAt asc
         limit #{offset}, #{pageSize}
     </select>
 
@@ -199,6 +201,7 @@
                PostCount,
                FollowCount,
                Status,
+               ShowOnHome,
                CreatedAt,
                UpdatedAt
         from Board
@@ -245,6 +248,159 @@
         from Notification
         where UserId = #{userId}
           and IsRead = 0
+    </select>
+
+    <!-- 与当前用户相关的所有私信（收或发），用于聚合会话列表 -->
+    <select id="findConversations" resultType="zzz.service.forum.domain.pojo.NotificationPojo">
+        select Id,
+               UserId,
+               Type,
+               SourceUserId,
+               TargetId,
+               Content,
+               IsRead,
+               CreatedAt
+        from Notification
+        where Type = 1
+          and (UserId = #{me} or SourceUserId = #{me})
+          and SourceUserId is not null
+          and SourceUserId &lt;&gt; 0
+        order by CreatedAt desc
+    </select>
+
+    <!-- 与某用户的双向私信历史（按时间正序） -->
+    <select id="findPrivateMessages" resultType="zzz.service.forum.domain.pojo.NotificationPojo">
+        select Id,
+               UserId,
+               Type,
+               SourceUserId,
+               TargetId,
+               Content,
+               IsRead,
+               CreatedAt
+        from Notification
+        where Type = 1
+          and ((UserId = #{me} and SourceUserId = #{other})
+            or (UserId = #{other} and SourceUserId = #{me}))
+        order by CreatedAt asc
+        limit 200
+    </select>
+
+    <!-- 标记与某用户的会话为已读（对方发给我的未读私信） -->
+    <update id="markConversationRead">
+        update Notification
+        set IsRead = 1
+        where UserId = #{me}
+          and SourceUserId = #{other}
+          and Type = 1
+          and IsRead = 0
+    </update>
+
+    <!-- 查询帖子所属用户ID -->
+    <select id="findPostOwner" resultType="java.lang.Long">
+        select UserId
+        from Post
+        where Id = #{id}
+          and Deleted = 0
+    </select>
+
+    <!-- 软删除帖子 -->
+    <update id="softDeletePost">
+        update Post
+        set Deleted = 1,
+            UpdatedAt = NOW()
+        where Id = #{id}
+    </update>
+
+    <!-- 查询评论所属用户ID -->
+    <select id="findCommentOwner" resultType="java.lang.Long">
+        select UserId
+        from Comment
+        where Id = #{id}
+          and Status = 1
+    </select>
+
+    <!-- 软删除评论 -->
+    <update id="softDeleteComment">
+        update Comment
+        set Status = 0
+        where Id = #{id}
+    </update>
+
+    <!-- 我的发帖列表 -->
+    <select id="findTopicsByUser" resultType="zzz.service.forum.domain.pojo.PostPojo">
+        select
+        <include refid="topicColumns"/>
+        from Post
+        left join Board on Board.Id = Post.BoardId
+        where Post.Deleted = 0
+          and Post.UserId = #{userId}
+        order by Post.CreatedAt desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <!-- 我的发帖总数 -->
+    <select id="countTopicsByUser" resultType="long">
+        select count(1)
+        from Post
+        where Deleted = 0
+          and UserId = #{userId}
+    </select>
+
+    <!-- 我的评论列表（含帖子标题） -->
+    <select id="findCommentsByUser" resultType="java.util.Map">
+        select Comment.Id           as id,
+               Comment.PostId       as postId,
+               Comment.Content      as content,
+               Comment.LikeCount    as likeCount,
+               Comment.CreatedAt    as createdAt,
+               Post.Title           as postTitle
+        from Comment
+        left join Post on Post.Id = Comment.PostId
+        where Comment.UserId = #{userId}
+          and Comment.Status = 1
+        order by Comment.CreatedAt desc
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <!-- 我的评论总数 -->
+    <select id="countCommentsByUser" resultType="long">
+        select count(1)
+        from Comment
+        where UserId = #{userId}
+          and Status = 1
+    </select>
+
+    <!-- 我的获赞总数（帖子 + 评论点赞数之和） -->
+    <select id="sumUserLikes" resultType="long">
+        select (
+          (select coalesce(sum(LikeCount), 0) from Post where UserId = #{userId} and Deleted = 0)
+          +
+          (select coalesce(sum(LikeCount), 0) from Comment where UserId = #{userId} and Status = 1)
+        )
+    </select>
+
+    <!-- 我的获赞内容（被赞的帖子/评论，赞数>0） -->
+    <select id="findLikedByUser" resultType="java.util.Map">
+        select 'post' as type,
+               Id as id,
+               Title as title,
+               LikeCount as likeCount,
+               CreatedAt as createdAt,
+               Id as postId
+        from Post
+        where UserId = #{userId} and Deleted = 0 and LikeCount > 0
+        union all
+        select 'comment' as type,
+               Comment.Id as id,
+               Comment.Content as title,
+               Comment.LikeCount as likeCount,
+               Comment.CreatedAt as createdAt,
+               Comment.PostId as postId
+        from Comment
+        where Comment.UserId = #{userId} and Comment.Status = 1 and Comment.LikeCount > 0
+        order by likeCount desc, createdAt desc
+        limit #{offset}, #{pageSize}
     </select>
 
     <!-- 新增通知 -->

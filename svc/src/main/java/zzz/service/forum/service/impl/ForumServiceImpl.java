@@ -18,14 +18,19 @@ import zzz.service.forum.mapper.NotificationMapper;
 import zzz.service.forum.mapper.ReportMapper;
 import zzz.service.forum.mapper.UserMapper;
 import zzz.service.forum.service.ForumService;
+import zzz.service.forum.service.RedisService;
 import zzz.service.forum.utils.BaseBusinessException;
 import zzz.service.forum.utils.SnowflakeIdGenerator;
+import zzz.service.forum.websocket.NotifyWebSocketHandler;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -66,6 +71,8 @@ public class ForumServiceImpl implements ForumService {
     private SnowflakeIdGenerator snowflakeIdGenerator;
     @Resource
     private UserMapper userMapper;
+    @Resource
+    private RedisService redisService;
 
     private String currentUserId() {
         Long uid = UserContext.getUserId();
@@ -217,7 +224,7 @@ public class ForumServiceImpl implements ForumService {
     }
 
     @Override
-    public CommentPojo createComment(String postId, String content, Long parentId, Long rootId) {
+    public CommentPojo createComment(String postId, String content, Long parentId, Long rootId, Long replyUserId) {
         requireLogin();
         if (content == null || content.trim().isEmpty()) {
             throw new BaseBusinessException("评论内容不能为空");
@@ -233,7 +240,7 @@ public class ForumServiceImpl implements ForumService {
         comment.setUserid(UserContext.getUserId());
         comment.setRootid(rootId == null ? 0L : rootId);
         comment.setParentid(parentId == null ? 0L : parentId);
-        comment.setReplyuserid(0L);
+        comment.setReplyuserid(replyUserId == null ? 0L : replyUserId);
         comment.setAnonymousidentityid(null);
         // 使用真实用户信息，不再使用匿名随机名称
         comment.setAnonymousname(getUserNickname());
@@ -358,7 +365,9 @@ public class ForumServiceImpl implements ForumService {
         long totalComments = forumMapper.countAllComments();
         long totalUsers = forumMapper.countAllUsers();
         long activeTopics = forumMapper.countRecentActivePosts();
-        long online = Math.max(8L, totalUsers / 10 + 8);
+        // 在线用户数 = Redis 中有效的 access token 数量（近 30 分钟内登录）
+        Set<String> accessKeys = redisService.scanKeysWithPrefix("login:access:");
+        long online = accessKeys == null ? 0 : accessKeys.size();
 
         data.put("onlineCount", online);
         data.put("activeTopics", activeTopics);
@@ -380,20 +389,215 @@ public class ForumServiceImpl implements ForumService {
     @Override
     public Map<String, Object> messages(Integer pageNum, Integer pageSize) {
         requireLogin();
-        String userId = currentUserId();
-        int page = pageNum == null || pageNum < 1 ? 1 : pageNum;
-        int size = pageSize == null || pageSize < 1 ? 20 : Math.min(pageSize, 100);
-        int offset = (page - 1) * size;
+        String me = currentUserId();
 
-        List<NotificationPojo> list = forumMapper.findNotifications(userId, offset, size);
-        long unread = forumMapper.countUnreadNotifications(userId);
+        // 拉取与当前用户相关的所有私信（收或发），按时间倒序
+        List<NotificationPojo> all = forumMapper.findConversations(me);
+        // 按对话对方聚合：首次出现即最新一条；累计该会话未读数
+        Map<String, Map<String, Object>> convMap = new LinkedHashMap<>();
+        long totalUnread = 0;
+        for (NotificationPojo n : all) {
+            String other = otherIdOf(n, me);
+            if (other == null) continue;
+            boolean toMe = n.getUserid() != null && me.equals(String.valueOf(n.getUserid()));
+            boolean unread = toMe && n.getIsread() != null && n.getIsread() == 0;
+            if (unread) totalUnread++;
+
+            Map<String, Object> conv = convMap.get(other);
+            if (conv == null) {
+                conv = new HashMap<>();
+                conv.put("userId", other);
+                conv.put("lastMessage", n.getContent() == null ? "" : n.getContent());
+                conv.put("time", n.getCreatedat());
+                conv.put("unread", 0);
+                convMap.put(other, conv);
+            }
+            if (unread) {
+                conv.put("unread", ((Integer) conv.get("unread")) + 1);
+            }
+        }
+
+        // 补齐对方昵称
+        List<Map<String, Object>> list = new ArrayList<>(convMap.values());
+        for (Map<String, Object> conv : list) {
+            conv.put("nickname", nicknameOf((String) conv.get("userId")));
+        }
 
         Map<String, Object> result = new HashMap<>();
         result.put("list", list);
-        result.put("unread", unread);
+        result.put("unread", totalUnread);
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> messageHistory(Long toUserId) {
+        requireLogin();
+        if (toUserId == null) {
+            throw new BaseBusinessException("接收用户不能为空");
+        }
+        String me = currentUserId();
+        String other = String.valueOf(toUserId);
+        List<NotificationPojo> all = forumMapper.findPrivateMessages(me, other);
+
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (NotificationPojo n : all) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", n.getId());
+            m.put("content", n.getContent() == null ? "" : n.getContent());
+            m.put("time", n.getCreatedat());
+            boolean mine = n.getSourceuserid() != null && me.equals(String.valueOf(n.getSourceuserid()));
+            m.put("mine", mine);
+            m.put("fromUserId", n.getSourceuserid() == null ? null : String.valueOf(n.getSourceuserid()));
+            list.add(m);
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", list);
+        result.put("toUserId", other);
+        result.put("nickname", nicknameOf(other));
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> markRead(Long toUserId) {
+        requireLogin();
+        if (toUserId == null) {
+            throw new BaseBusinessException("接收用户不能为空");
+        }
+        String me = currentUserId();
+        int rows = forumMapper.markConversationRead(me, String.valueOf(toUserId));
+        Map<String, Object> result = new HashMap<>();
+        result.put("updated", rows);
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> deleteTopic(String id) {
+        requireLogin();
+        if (id == null || id.trim().isEmpty()) {
+            throw new BaseBusinessException("帖子ID不能为空");
+        }
+        Long owner = forumMapper.findPostOwner(id);
+        if (owner == null) {
+            throw new BaseBusinessException("帖子不存在或已删除");
+        }
+        if (!canModify(owner)) {
+            throw new BaseBusinessException("无权删除该帖子");
+        }
+        forumMapper.softDeletePost(id);
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", id);
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> deleteComment(String id) {
+        requireLogin();
+        if (id == null || id.trim().isEmpty()) {
+            throw new BaseBusinessException("评论ID不能为空");
+        }
+        Long owner = forumMapper.findCommentOwner(id);
+        if (owner == null) {
+            throw new BaseBusinessException("评论不存在或已删除");
+        }
+        if (!canModify(owner)) {
+            throw new BaseBusinessException("无权删除该评论");
+        }
+        forumMapper.softDeleteComment(id);
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", id);
+        return result;
+    }
+
+    /** 判断当前用户能否修改/删除目标资源：本人或管理员 */
+    private boolean canModify(Long owner) {
+        Long me = UserContext.getUserId();
+        if (me == null) return false;
+        if (me.equals(owner)) return true;
+        User u = userMapper.selectById(me);
+        return u != null && u.getRole() != null && u.getRole() == 1;
+    }
+
+    @Override
+    public Map<String, Object> myPosts(Integer pageNum, Integer pageSize) {
+        requireLogin();
+        String me = currentUserId();
+        int page = pageNum == null || pageNum < 1 ? 1 : pageNum;
+        int size = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 50);
+        int offset = (page - 1) * size;
+
+        List<PostPojo> list = forumMapper.findTopicsByUser(me, offset, size);
+        long total = forumMapper.countTopicsByUser(me);
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", list);
+        result.put("total", total);
         result.put("pageNum", page);
         result.put("pageSize", size);
         return result;
+    }
+
+    @Override
+    public Map<String, Object> myComments(Integer pageNum, Integer pageSize) {
+        requireLogin();
+        String me = currentUserId();
+        int page = pageNum == null || pageNum < 1 ? 1 : pageNum;
+        int size = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 50);
+        int offset = (page - 1) * size;
+
+        List<Map<String, Object>> list = forumMapper.findCommentsByUser(me, offset, size);
+        long total = forumMapper.countCommentsByUser(me);
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", list);
+        result.put("total", total);
+        result.put("pageNum", page);
+        result.put("pageSize", size);
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> myLikes(Integer pageNum, Integer pageSize) {
+        requireLogin();
+        String me = currentUserId();
+        // 获赞内容通常不多，单页取 100 条
+        List<Map<String, Object>> list = forumMapper.findLikedByUser(me, 0, 100);
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", list);
+        result.put("total", list.size());
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> myStats() {
+        requireLogin();
+        String me = currentUserId();
+        Map<String, Object> result = new HashMap<>();
+        result.put("posts", forumMapper.countTopicsByUser(me));
+        result.put("comments", forumMapper.countCommentsByUser(me));
+        result.put("likes", forumMapper.sumUserLikes(me));
+        return result;
+    }
+
+    /** 计算私信对话中的"对方"用户 ID */
+    private String otherIdOf(NotificationPojo n, String me) {
+        if (n == null) return null;
+        boolean toMe = n.getUserid() != null && me.equals(String.valueOf(n.getUserid()));
+        if (toMe) {
+            // 我是接收者，对方是发送者
+            return n.getSourceuserid() == null ? null : String.valueOf(n.getSourceuserid());
+        }
+        // 我是发送者，对方是接收者
+        return n.getUserid() == null ? null : String.valueOf(n.getUserid());
+    }
+
+    /** 按用户 ID 查询昵称，失败回退为"用户" */
+    private String nicknameOf(String userId) {
+        if (userId == null || userId.isEmpty()) return "用户";
+        try {
+            User u = userMapper.selectById(Long.valueOf(userId));
+            return u != null && u.getNickname() != null ? u.getNickname() : "用户";
+        } catch (NumberFormatException e) {
+            return "用户";
+        }
     }
 
     @Override
@@ -415,6 +619,16 @@ public class ForumServiceImpl implements ForumService {
         n.setIsread(0);
         n.setCreatedat(new Date());
         notificationMapper.insert(n);
+
+        // 通过 WebSocket 实时推送给接收方（不在线则静默，前端轮询兜底）
+        Map<String, Object> push = new HashMap<>();
+        push.put("type", "pm");
+        push.put("id", n.getId());
+        push.put("fromUserId", n.getSourceuserid());
+        push.put("fromNickname", getUserNickname());
+        push.put("content", n.getContent());
+        push.put("createdAt", n.getCreatedat());
+        NotifyWebSocketHandler.sendToUser(toUserId, push);
 
         Map<String, Object> result = new HashMap<>();
         result.put("id", n.getId());

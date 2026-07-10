@@ -10,6 +10,8 @@ export default { name: 'HotTopics' }
     </div>
 
     <div class="topics-list">
+      <div v-if="loading" class="loading-tip">加载中...</div>
+      <template v-else>
       <div
         v-for="(item, idx) in topics"
         :key="item.id"
@@ -40,6 +42,8 @@ export default { name: 'HotTopics' }
           </div>
         </div>
       </div>
+      <el-empty v-if="!topics.length" description="暂无热门话题" :image-size="60" />
+      </template>
     </div>
   </div>
 </template>
@@ -54,13 +58,17 @@ import {getHotTopics, mapTopic} from '@/api'
 const router = useRouter()
 
 const topics = ref([])
+const loading = ref(false)
 
 async function loadHot() {
+  loading.value = true
   try {
     const res = await getHotTopics(20)
     topics.value = (res.data || []).map(mapTopic)
   } catch (e) {
     topics.value = []
+  } finally {
+    loading.value = false
   }
 }
 
@@ -87,6 +95,13 @@ onMounted(loadHot)
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+.loading-tip {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .page-header {

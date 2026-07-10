@@ -9,19 +9,28 @@
           </el-avatar>
           <div class="user-info">
             <div class="user-nickname">{{ userInfo.nickname }}</div>
-            <div class="user-id">{{ userInfo.anonymousId }}</div>
+          </div>
+          <div class="follow-stats">
+            <div class="follow-stat-item" @click="openFollowDialog('following')">
+              <span class="follow-stat-value">{{ followLoading ? '-' : following.length }}</span>
+              <span class="follow-stat-label">关注的人</span>
+            </div>
+            <div class="follow-stat-item" @click="openFollowDialog('followers')">
+              <span class="follow-stat-value">{{ followLoading ? '-' : followers.length }}</span>
+              <span class="follow-stat-label">关注我的人</span>
+            </div>
           </div>
           <div class="user-stats">
-            <div class="stat-item">
-              <span class="stat-value">{{ userStats.posts }}</span>
+            <div class="stat-item clickable" @click="goMy('posts')">
+              <span class="stat-value">{{ statsLoading ? '-' : userStats.posts }}</span>
               <span class="stat-label">发布</span>
             </div>
-            <div class="stat-item">
-              <span class="stat-value">{{ userStats.comments }}</span>
+            <div class="stat-item clickable" @click="goMy('comments')">
+              <span class="stat-value">{{ statsLoading ? '-' : userStats.comments }}</span>
               <span class="stat-label">评论</span>
             </div>
-            <div class="stat-item">
-              <span class="stat-value">{{ userStats.likes }}</span>
+            <div class="stat-item clickable" @click="goMy('likes')">
+              <span class="stat-value">{{ statsLoading ? '-' : userStats.likes }}</span>
               <span class="stat-label">获赞</span>
             </div>
           </div>
@@ -207,16 +216,134 @@
         </div>
       </div>
     </div>
+
+    <!-- 关注 / 粉丝列表弹窗 -->
+    <el-dialog
+      v-model="followDialogVisible"
+      :title="followDialogType === 'following' ? '关注的人' : '关注我的人'"
+      width="420px"
+      append-to-body
+    >
+      <div class="follow-dialog-list">
+        <div v-for="u in followDialogList" :key="u.userId" class="follow-dialog-item">
+          <span class="fd-avatar" :style="{ background: colorOf(u.userId) }">{{ (u.nickname || '?').charAt(0) }}</span>
+          <span class="fd-name">{{ u.nickname }}</span>
+          <el-button
+            size="small"
+            :type="followBtnType(u)"
+            :disabled="isSelf(u)"
+            @click="onFollowBtn(u)"
+            @mouseenter="hoverFollowId = u.userId"
+            @mouseleave="hoverFollowId = null"
+          >{{ followBtnText(u) }}</el-button>
+          <el-button size="small" @click="goPM(u)">私信</el-button>
+        </div>
+        <el-empty
+          v-if="!followDialogList.length"
+          :description="followDialogType === 'following' ? '暂未关注任何人' : '暂无粉丝'"
+          :image-size="60"
+        />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
-import { updateProfile } from '@/api'
+import { updateProfile, getFollowing, getFollowers } from '@/api'
 
+const router = useRouter()
 const activeTab = ref('profile')
+
+// 关注 / 粉丝
+const following = ref([])
+const followers = ref([])
+const followLoading = ref(true)
+const followDialogVisible = ref(false)
+const followDialogType = ref('following') // following | followers
+const followDialogList = computed(() => followDialogType.value === 'following' ? following.value : followers.value)
+
+const FOLLOW_COLORS = ['#7C3AED','#3B82F6','#16A34A','#EA580C','#F59E0B','#EF4444','#0EA5E9','#8B5CF6','#EC4899','#14B8A6']
+function colorOf(userId) {
+  if (!userId) return FOLLOW_COLORS[0]
+  const s = String(userId)
+  let hash = 0
+  for (let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash)
+  return FOLLOW_COLORS[Math.abs(hash) % FOLLOW_COLORS.length]
+}
+
+function openFollowDialog(type) {
+  followDialogType.value = type
+  followDialogVisible.value = true
+}
+
+function goPM(u) {
+  followDialogVisible.value = false
+  router.push({ path: '/messages', query: { to: u.userId, name: u.nickname } })
+}
+
+async function loadFollowData() {
+  try {
+    const [fRes, frRes] = await Promise.all([getFollowing(), getFollowers()])
+    following.value = (fRes.data || []).map(u => ({ userId: String(u.userId), nickname: u.nickname || '用户' }))
+    followers.value = (frRes.data || []).map(u => ({ userId: String(u.userId), nickname: u.nickname || '用户' }))
+  } catch { /* 忽略 */ }
+  followLoading.value = false
+}
+
+// 当前登录用户 ID
+const currentUserId = computed(() => {
+  try { return String(JSON.parse(localStorage.getItem('userInfo') || '{}').userId || '') }
+  catch { return '' }
+})
+const hoverFollowId = ref(null)
+
+function isSelf(u) { return u && String(u.userId) === currentUserId.value }
+function isFollowing(u) { return u && following.value.some(f => String(f.userId) === String(u.userId)) }
+function isMutual(u) { return isFollowing(u) && followers.value.some(f => String(f.userId) === String(u.userId)) }
+
+function followBtnText(u) {
+  if (isSelf(u)) return '我'
+  if (hoverFollowId.value === u.userId && isFollowing(u)) return '取消关注'
+  if (isMutual(u)) return '互关'
+  if (isFollowing(u)) return '已关注'
+  return '关注'
+}
+function followBtnType(u) {
+  // 未关注用主色突出，已关注/互关用默认
+  return (!isSelf(u) && !isFollowing(u)) ? 'primary' : ''
+}
+
+async function onFollowBtn(u) {
+  if (isSelf(u)) return
+  if (isFollowing(u)) {
+    // 取关
+    following.value = following.value.filter(f => String(f.userId) !== String(u.userId))
+    try {
+      await fetch(`/api/chat/follow/${u.userId}`, { method: 'DELETE', headers: { Authorization: localStorage.getItem('token') || '' } })
+    } catch {}
+  } else {
+    // 关注
+    following.value = [...following.value, { userId: String(u.userId), nickname: u.nickname }]
+    ElMessage.success('已关注 ' + u.nickname)
+    try {
+      await fetch('/api/chat/follow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: localStorage.getItem('token') || '' },
+        body: JSON.stringify({ userId: String(u.userId), nickname: u.nickname })
+      })
+    } catch {}
+  }
+  // 关注/取关会改变互关状态，刷新粉丝列表（关注我的人）
+  loadFollowData()
+}
+
+function goMy(tab) {
+  router.push({ path: '/my', query: { tab } })
+}
 
 // 用户信息
 const userInfo = ref({
@@ -227,10 +354,11 @@ const userInfo = ref({
 
 // 用户统计数据
 const userStats = ref({
-  posts: 12,
-  comments: 45,
-  likes: 89
+  posts: 0,
+  comments: 0,
+  likes: 0
 })
+const statsLoading = ref(true)
 
 // 个人资料表单
 const profileForm = ref({
@@ -379,17 +507,15 @@ const formatTime = (date) => {
 // 加载用户动态统计
 async function loadUserStats() {
   try {
-    const { getTopics, getForumStats } = await import('@/api')
-    // 尝试通过 forum API 获取统计数据
-    const statsRes = await getForumStats()
-    if (statsRes.data) {
-      userStats.value.posts = statsRes.data.totalTopics || 0
-      userStats.value.comments = statsRes.data.totalComments || 0
+    const { getMyStats } = await import('@/api')
+    const res = await getMyStats()
+    if (res.data) {
+      userStats.value.posts = res.data.posts || 0
+      userStats.value.comments = res.data.comments || 0
+      userStats.value.likes = res.data.likes || 0
     }
-    // 获赞数暂用本地缓存
-    const storedInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-    userStats.value.likes = storedInfo.likes || 0
   } catch { /* 忽略 */ }
+  statsLoading.value = false
 }
 
 // 加载活动记录
@@ -413,6 +539,7 @@ onMounted(() => {
   loadUserInfo()
   loadUserStats()
   loadActivityHistory()
+  loadFollowData()
   // 初始化时应用已保存的主题颜色
   const storedInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
   if (storedInfo.themeColor) {
@@ -488,6 +615,95 @@ onMounted(() => {
 .stat-label {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.stat-item.clickable {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.stat-item.clickable:hover {
+  background: var(--bg-light);
+}
+
+/* 关注 / 粉丝统计区 */
+.follow-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+.follow-stat-item {
+  text-align: center;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.follow-stat-item:hover {
+  background: var(--bg-light);
+}
+
+.follow-stat-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent-color);
+}
+
+.follow-stat-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* 关注 / 粉丝弹窗列表 */
+.follow-dialog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.follow-dialog-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-radius: 8px;
+}
+
+.follow-dialog-item:hover {
+  background: var(--bg-light);
+}
+
+.fd-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.fd-name {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-menu {

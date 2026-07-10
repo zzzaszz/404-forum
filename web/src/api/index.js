@@ -211,14 +211,66 @@ export function getMessages() {
   return request({url: '/forum/messages', method: 'get'})
 }
 
+/** 与某用户的私信历史（双向） */
+export function getMessageHistory(toUserId) {
+  return request({url: '/forum/messages/history', method: 'get', params: {toUserId}})
+}
+
+/** 标记与某用户的会话为已读 */
+export function markMessageRead(toUserId) {
+  return request({url: '/forum/messages/read', method: 'post', data: {toUserId}})
+}
+
 /** 发送私信 */
 export function sendMessage(data) {
   return request({url: '/forum/message/send', method: 'post', data})
 }
 
+// ============ 关注（/chat） ============
+
+/** 我关注的人 */
+export function getFollowing() {
+  return request({url: '/chat/follow', method: 'get'})
+}
+
+/** 关注我的人 */
+export function getFollowers() {
+  return request({url: '/chat/followers', method: 'get'})
+}
+
 /** 搜索话题 */
 export function searchTopics(params = {}) {
   return request({url: '/forum/search', method: 'get', params})
+}
+
+/** 删除帖子（本人或管理员） */
+export function deleteTopic(id) {
+  return request({url: '/forum/topic/delete', method: 'post', data: {id}})
+}
+
+/** 删除评论（本人或管理员） */
+export function deleteComment(id) {
+  return request({url: '/forum/comment/delete', method: 'post', data: {id}})
+}
+
+/** 我的发帖 */
+export function getMyPosts(params = {}) {
+  return request({url: '/forum/my/posts', method: 'get', params})
+}
+
+/** 我的评论 */
+export function getMyComments(params = {}) {
+  return request({url: '/forum/my/comments', method: 'get', params})
+}
+
+/** 我的获赞 */
+export function getMyLikes(params = {}) {
+  return request({url: '/forum/my/likes', method: 'get', params})
+}
+
+/** 我的统计（发帖/评论/获赞数） */
+export function getMyStats() {
+  return request({url: '/forum/my/stats', method: 'get'})
 }
 
 // ============ 字段映射工具：后端 Pojo → 前端展示对象 ============
@@ -253,6 +305,7 @@ export function mapTopic(p) {
   if (!p) return null
   return {
     id: p.id,
+    userId: p.userid,
     boardId: p.boardid,
     boardCode: p.boardcode || '',
     boardName: p.boardname || '',
@@ -305,6 +358,9 @@ export function mapComment(c) {
     content: c.content || '',
     likes: c.likecount || 0,
     replies: c.replycount || 0,
+    parentId: c.parentid || 0,
+    replyUserId: c.replyuserid || 0,
+    replyUserName: c.replyusername || '',
     createTime: c.createdat,
   }
 }

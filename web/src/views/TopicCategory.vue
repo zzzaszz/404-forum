@@ -74,6 +74,8 @@ export default { name: 'TopicCategory' }
     </el-dialog>
 
     <div class="topic-list">
+      <div v-if="loading" class="loading-tip">加载中...</div>
+      <template v-else>
       <div
         v-for="item in topics"
         :key="item.id"
@@ -97,6 +99,7 @@ export default { name: 'TopicCategory' }
       </div>
 
       <el-empty v-if="!topics.length" description="暂无话题" :image-size="60" />
+      </template>
     </div>
   </div>
 </template>
@@ -292,6 +295,13 @@ watch(categoryCode, () => loadTopics())
   border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
   padding: 8px;
+}
+
+.loading-tip {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 .topic-row {

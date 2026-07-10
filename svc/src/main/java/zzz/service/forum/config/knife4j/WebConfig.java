@@ -66,9 +66,9 @@ public class WebConfig implements WebMvcConfigurer, Filter {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 管理员权限拦截：用户管理接口仅管理员可访问
+        // 管理员权限拦截：用户管理、板块管理接口仅管理员可访问
         registry.addInterceptor(adminInterceptor)
-                .addPathPatterns("/user/**");
+                .addPathPatterns("/user/**", "/board/**");
     }
 
     // ========== Knife4j 认证过滤器实现 ==========

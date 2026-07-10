@@ -101,6 +101,12 @@ const routes = [
         name: 'Profile',
         component: () => import('@/views/Profile.vue')
       },
+      // 我的内容管理（发帖/评论/获赞/消息）
+      {
+        path: 'my',
+        name: 'MyContent',
+        component: () => import('@/views/MyContent.vue')
+      },
     ]
   },
   // 404 处理

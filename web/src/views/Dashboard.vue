@@ -10,11 +10,11 @@ export default { name: 'Dashboard' }
       <div class="status-badges">
         <span class="badge">
           <el-icon><UserFilled /></el-icon>
-          {{ onlineCount }} 在线
+          {{ statsLoading ? '-' : onlineCount }} 在线
         </span>
         <span class="badge">
           <el-icon><ChatDotRound /></el-icon>
-          {{ activeTopics }} 话题
+          {{ statsLoading ? '-' : activeTopics }} 话题
         </span>
       </div>
     </div>
@@ -52,7 +52,7 @@ export default { name: 'Dashboard' }
             <el-icon><Message /></el-icon>
           </div>
           <span class="quick-label">私信</span>
-          <span v-if="unreadCount > 0" class="unread-dot">{{ unreadCount }}</span>
+          <span v-if="messageStore.unread > 0" class="unread-dot">{{ messageStore.unread }}</span>
         </router-link>
       </div>
     </div>
@@ -142,19 +142,20 @@ import {
   getHotTopics,
   getOnlineUsers,
   getForumStats,
-  getMessages,
-  getBoardPageList,
+  getBoards,
   mapTopic,
   pickAvatar
 } from '@/api'
+import { useMessageStore } from '@/stores/message'
 
 const router = useRouter()
 
 const greeting = ref('你好')
 const nickname = ref('匿名用户')
+const messageStore = useMessageStore()
 const onlineCount = ref(0)
 const activeTopics = ref(0)
-const unreadCount = ref(0)
+const statsLoading = ref(true)
 
 try {
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
@@ -223,6 +224,7 @@ async function loadDashboard() {
       activeTopics.value = stats.data.activeTopics || 0
     }
   } catch (e) { /* 忽略 */ }
+  statsLoading.value = false
 
   try {
     const res = await getTopics({sort: 'latest', pageNum: 1, pageSize: 5})
@@ -239,15 +241,10 @@ async function loadDashboard() {
     onlineUsers.value = res.data?.users || []
   } catch (e) { /* 忽略 */ }
 
+  // 加载活跃板块作为快捷入口（C 端公开接口，仅显示首页快捷=1的板块）
   try {
-    const res = await getMessages()
-    unreadCount.value = res.data?.unread || 0
-  } catch (e) { /* 忽略 */ }
-
-  // 加载活跃板块作为快捷入口（只显示首页快捷=1的板块）
-  try {
-    const boardRes = await getBoardPageList({PageNum: 1, PageSize: 50})
-    const boards = (boardRes.data?.list || [])
+    const boardRes = await getBoards()
+    const boards = (boardRes.data || [])
       .filter(b => b.status === 1 && b.showonhome === 1)
       .sort((a, b) => (b.sortorder ?? 0) - (a.sortorder ?? 0))
       .slice(0, 8)

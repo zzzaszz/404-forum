@@ -24,7 +24,7 @@ function clearAuthData() {
 
 // 判断是否是刷新 token 的请求
 function isRefreshRequest(config) {
-  return config.url === '/auth/refresh' || config._isRefresh
+  return config.url === '/api/auth/refresh' || config._isRefresh
 }
 
 // 刷新 token
@@ -41,7 +41,7 @@ async function doRefreshToken() {
       timeout: 10000
     })
 
-    const response = await refreshClient.post('/auth/refresh', { refreshToken })
+    const response = await refreshClient.post('/api/auth/refresh', { refreshToken })
 
     if (response.data.code === 200 && response.data.data) {
       const data = response.data.data

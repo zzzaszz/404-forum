@@ -52,6 +52,8 @@ public class CommentPojo implements Serializable {
     // 创建时间
     @Excel(name = "创建时间")
     private Date createdat;
+    // 被回复用户昵称（非表字段，join User 展示用）
+    private String replyusername;
 
     // 主键ID
     public Long getId() {
@@ -170,6 +172,14 @@ public class CommentPojo implements Serializable {
         this.createdat = createdat;
     }
 
+    // 被回复用户昵称
+    public String getReplyusername() {
+        return replyusername;
+    }
+
+    public void setReplyusername(String replyusername) {
+        this.replyusername = replyusername;
+    }
 
 }
 

@@ -40,6 +40,7 @@
           <el-menu-item index="/messages">
             <el-icon><Message /></el-icon>
             <span>私信</span>
+            <el-badge v-if="messageStore.unread > 0" :value="messageStore.unread" class="menu-badge" />
           </el-menu-item>
 
           <el-sub-menu index="topics">
@@ -67,6 +68,11 @@
           <el-menu-item index="/search">
             <el-icon><Search /></el-icon>
             <span>搜索</span>
+          </el-menu-item>
+
+          <el-menu-item index="/my">
+            <el-icon><Files /></el-icon>
+            <span>我的内容</span>
           </el-menu-item>
 
           <!-- 管理分组：仅管理员可见 -->
@@ -164,6 +170,7 @@ import {
   Coffee,
   Collection,
   Expand,
+  Files,
   Fold,
   HomeFilled,
   Loading,
@@ -176,10 +183,12 @@ import {
   UserFilled,
   VideoPlay
 } from '@element-plus/icons-vue'
-import {getBoardPageList, logout} from '@/api'
+import {getBoards, logout} from '@/api'
+import {useMessageStore} from '@/stores/message'
 
 const router = useRouter()
 const route = useRoute()
+const messageStore = useMessageStore()
 const isCollapsed = ref(false)
 const isLoggingOut = ref(false)
 const isMobile = ref(false)
@@ -235,9 +244,9 @@ const topicMenuItems = computed(() => {
 
 async function fetchBoards() {
   try {
-    const res = await getBoardPageList({PageNum: 1, PageSize: 100})
+    const res = await getBoards()
     if (res.code === 200 && res.data) {
-      allBoards.value = res.data.list || []
+      allBoards.value = res.data || []
     }
   } catch {
     // 接口异常时固定分类回退到默认名称
@@ -299,6 +308,7 @@ const currentMenu = computed(() => {
     '/topic/help': '求助问答',
     '/hot': '热门话题',
     '/search': '搜索',
+    '/my': '我的内容',
     '/board': '板块管理',
     '/user': '用户管理',
     '/profile': '个人设置'
@@ -556,6 +566,14 @@ const handleLogout = async () => {
   text-align: center;
   color: #94a3b8;
   flex-shrink: 0;
+}
+
+/* 私信未读角标 */
+.menu-badge :deep(.el-badge__content) {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
 }
 
 /* ============ 主内容区 ============ */

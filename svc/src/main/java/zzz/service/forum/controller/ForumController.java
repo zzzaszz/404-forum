@@ -105,9 +105,34 @@ public class ForumController {
             String content = body.get("content") == null ? null : String.valueOf(body.get("content"));
             Long parentId = parseLong(body.get("parentId"));
             Long rootId = parseLong(body.get("rootId"));
-            return R.ok(forumService.createComment(postId, content, parentId, rootId));
+            Long replyUserId = parseLong(body.get("replyUserId"));
+            return R.ok(forumService.createComment(postId, content, parentId, rootId, replyUserId));
         } catch (Exception e) {
             logger.warn("createComment error", e);
+            return R.fail(e.getMessage());
+        }
+    }
+
+    @ApiOperation("删除帖子（本人或管理员）")
+    @PostMapping("/topic/delete")
+    public R<Map<String, Object>> deleteTopic(@RequestBody Map<String, Object> body) {
+        try {
+            String id = body.get("id") == null ? null : String.valueOf(body.get("id"));
+            return R.ok(forumService.deleteTopic(id));
+        } catch (Exception e) {
+            logger.warn("deleteTopic error", e);
+            return R.fail(e.getMessage());
+        }
+    }
+
+    @ApiOperation("删除评论（本人或管理员）")
+    @PostMapping("/comment/delete")
+    public R<Map<String, Object>> deleteComment(@RequestBody Map<String, Object> body) {
+        try {
+            String id = body.get("id") == null ? null : String.valueOf(body.get("id"));
+            return R.ok(forumService.deleteComment(id));
+        } catch (Exception e) {
+            logger.warn("deleteComment error", e);
             return R.fail(e.getMessage());
         }
     }
@@ -203,6 +228,29 @@ public class ForumController {
         }
     }
 
+    @ApiOperation("与某用户的私信历史")
+    @GetMapping("/messages/history")
+    public R<Map<String, Object>> messageHistory(@RequestParam("toUserId") String toUserId) {
+        try {
+            return R.ok(forumService.messageHistory(parseLong(toUserId)));
+        } catch (Exception e) {
+            logger.warn("messageHistory error", e);
+            return R.fail(e.getMessage());
+        }
+    }
+
+    @ApiOperation("标记与某用户的会话为已读")
+    @PostMapping("/messages/read")
+    public R<Map<String, Object>> markRead(@RequestBody Map<String, Object> body) {
+        try {
+            Long toUserId = parseLong(body.get("toUserId"));
+            return R.ok(forumService.markRead(toUserId));
+        } catch (Exception e) {
+            logger.warn("markRead error", e);
+            return R.fail(e.getMessage());
+        }
+    }
+
     @ApiOperation("发送私信")
     @PostMapping("/message/send")
     public R<Map<String, Object>> sendMessage(@RequestBody Map<String, Object> body) {
@@ -227,6 +275,55 @@ public class ForumController {
             return R.ok(forumService.search(keyword, pageNum, pageSize));
         } catch (Exception e) {
             logger.warn("search error", e);
+            return R.fail(e.getMessage());
+        }
+    }
+
+    // ==================== 我的内容 ====================
+
+    @ApiOperation("我的发帖")
+    @GetMapping("/my/posts")
+    public R<Map<String, Object>> myPosts(@RequestParam(required = false) Integer pageNum,
+                                          @RequestParam(required = false) Integer pageSize) {
+        try {
+            return R.ok(forumService.myPosts(pageNum, pageSize));
+        } catch (Exception e) {
+            logger.warn("myPosts error", e);
+            return R.fail(e.getMessage());
+        }
+    }
+
+    @ApiOperation("我的评论")
+    @GetMapping("/my/comments")
+    public R<Map<String, Object>> myComments(@RequestParam(required = false) Integer pageNum,
+                                             @RequestParam(required = false) Integer pageSize) {
+        try {
+            return R.ok(forumService.myComments(pageNum, pageSize));
+        } catch (Exception e) {
+            logger.warn("myComments error", e);
+            return R.fail(e.getMessage());
+        }
+    }
+
+    @ApiOperation("我的获赞")
+    @GetMapping("/my/likes")
+    public R<Map<String, Object>> myLikes(@RequestParam(required = false) Integer pageNum,
+                                          @RequestParam(required = false) Integer pageSize) {
+        try {
+            return R.ok(forumService.myLikes(pageNum, pageSize));
+        } catch (Exception e) {
+            logger.warn("myLikes error", e);
+            return R.fail(e.getMessage());
+        }
+    }
+
+    @ApiOperation("我的统计")
+    @GetMapping("/my/stats")
+    public R<Map<String, Object>> myStats() {
+        try {
+            return R.ok(forumService.myStats());
+        } catch (Exception e) {
+            logger.warn("myStats error", e);
             return R.fail(e.getMessage());
         }
     }
