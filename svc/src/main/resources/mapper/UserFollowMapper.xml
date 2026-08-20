@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="zzz.service.forum.mapper.UserFollowMapper">
+
+    <resultMap type="zzz.service.forum.domain.UserFollowEntity" id="UserFollowMap">
+        <result property="id" column="Id" jdbcType="BIGINT"/>
+        <result property="userid" column="UserId" jdbcType="BIGINT"/>
+        <result property="followuserid" column="FollowUserId" jdbcType="BIGINT"/>
+        <result property="nickname" column="Nickname" jdbcType="VARCHAR"/>
+        <result property="createdat" column="CreatedAt" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="zzz.service.forum.domain.UserFollowEntity">
+        insert into UserFollow(Id, UserId, FollowUserId, Nickname, CreatedAt)
+        values (#{id}, #{userid}, #{followuserid}, #{nickname}, #{createdat})
+    </insert>
+
+    <delete id="deleteByUserAndFollow">
+        delete from UserFollow
+        where UserId = #{userId}
+          and FollowUserId = #{followUserId}
+    </delete>
+
+    <select id="listByUserId" resultMap="UserFollowMap">
+        select Id, UserId, FollowUserId, Nickname, CreatedAt
+        from UserFollow
+        where UserId = #{userId}
+        order by CreatedAt desc
+    </select>
+
+    <select id="listFollowers" resultMap="UserFollowMap">
+        select Id, UserId, FollowUserId, Nickname, CreatedAt
+        from UserFollow
+        where FollowUserId = #{followUserId}
+        order by CreatedAt desc
+    </select>
+</mapper>

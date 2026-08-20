@@ -43,6 +43,16 @@
             <el-badge v-if="messageStore.unread > 0" :value="messageStore.unread" class="menu-badge" />
           </el-menu-item>
 
+          <el-menu-item index="/ai">
+            <el-icon><MagicStick /></el-icon>
+            <span>AI 对话</span>
+          </el-menu-item>
+
+          <el-menu-item index="/ai/agents">
+            <el-icon><Cpu /></el-icon>
+            <span>AI 角色</span>
+          </el-menu-item>
+
           <el-sub-menu index="topics">
             <template #title>
               <el-icon><Collection /></el-icon>
@@ -169,11 +179,13 @@ import {
   ChatLineRound,
   Coffee,
   Collection,
+  Cpu,
   Expand,
   Files,
   Fold,
   HomeFilled,
   Loading,
+  MagicStick,
   Message,
   Monitor,
   QuestionFilled,
@@ -301,6 +313,8 @@ const currentMenu = computed(() => {
     '/': '首页',
     '/chat': '聊天室',
     '/messages': '私信',
+    '/ai': 'AI 对话',
+    '/ai/agents': 'AI 角色',
     '/topic/random': '随便聊聊',
     '/topic/tech': '技术交流',
     '/topic/game': '游戏讨论',

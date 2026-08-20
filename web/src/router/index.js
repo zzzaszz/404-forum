@@ -31,6 +31,18 @@ const routes = [
         name: 'Messages',
         component: () => import('@/views/Messages.vue')
       },
+      // AI 对话
+      {
+        path: 'ai',
+        name: 'AiChat',
+        component: () => import('@/views/AiChat.vue')
+      },
+      // AI 角色
+      {
+        path: 'ai/agents',
+        name: 'AiAgentManage',
+        component: () => import('@/views/AiAgentManage.vue')
+      },
       // 热门话题
       {
         path: 'hot',

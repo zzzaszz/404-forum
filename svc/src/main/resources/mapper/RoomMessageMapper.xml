@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="zzz.service.forum.mapper.RoomMessageMapper">
+
+    <resultMap type="zzz.service.forum.domain.RoomMessageEntity" id="RoomMessageMap">
+        <result property="id" column="Id" jdbcType="BIGINT"/>
+        <result property="roomid" column="RoomId" jdbcType="INTEGER"/>
+        <result property="userid" column="UserId" jdbcType="BIGINT"/>
+        <result property="nickname" column="Nickname" jdbcType="VARCHAR"/>
+        <result property="content" column="Content" jdbcType="VARCHAR"/>
+        <result property="createtime" column="CreateTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="zzz.service.forum.domain.RoomMessageEntity">
+        insert into RoomMessage(Id, RoomId, UserId, Nickname, Content, CreateTime)
+        values (#{id}, #{roomid}, #{userid}, #{nickname}, #{content}, #{createtime})
+    </insert>
+
+    <select id="selectRecent" resultMap="RoomMessageMap">
+        select Id, RoomId, UserId, Nickname, Content, CreateTime
+        from (
+                 select Id, RoomId, UserId, Nickname, Content, CreateTime
+                 from RoomMessage
+                 where RoomId = #{roomId}
+                 order by CreateTime desc
+                 limit #{limit}
+             ) t
+        order by CreateTime asc
+    </select>
+</mapper>

@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>匿名聊天系统接入 AI 对话 —— 架构方案</title>
+<style>
+  :root {
+    --accent: #4f46e5;
+    --accent-soft: #eef2ff;
+    --accent-2: #7c3aed;
+    --ink: #1f2430;
+    --ink-2: #5a6272;
+    --ink-3: #8a91a3;
+    --line: #e5e7ef;
+    --bg: #f7f8fb;
+    --card: #ffffff;
+    --code-bg: #1e2230;
+    --code-ink: #d6dce8;
+    --ok: #0e9f6e;
+    --warn: #d97706;
+    --mono: "Cascadia Code", Consolas, "Courier New", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.75;
+    font-size: 15px;
+  }
+
+  /* ========== 布局 ========== */
+  .layout { display: flex; max-width: 1280px; margin: 0 auto; }
+  main { flex: 1; min-width: 0; padding: 40px 48px 80px; }
+
+  /* ========== 侧边导航 ========== */
+  aside {
+    width: 264px; flex-shrink: 0;
+    position: sticky; top: 0; height: 100vh;
+    padding: 28px 16px; overflow-y: auto;
+    border-right: 1px solid var(--line);
+    background: var(--card);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 18px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .brand .logo {
+    width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand b { font-size: 15px; display: block; line-height: 1.3; }
+  .brand span { font-size: 12px; color: var(--ink-3); }
+  nav a {
+    display: flex; gap: 8px; align-items: baseline;
+    padding: 7px 10px; border-radius: 7px;
+    color: var(--ink-2); text-decoration: none; font-size: 13.5px;
+    border-left: 3px solid transparent;
+  }
+  nav a .no { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  nav a:hover { background: var(--bg); color: var(--ink); }
+  nav a.active { background: var(--accent-soft); color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+  nav a.active .no { color: var(--accent); }
+
+  /* ========== 顶部 ========== */
+  .hero {
+    background: linear-gradient(135deg, #0f1220, #232a48);
+    color: #fff; border-radius: 16px;
+    padding: 34px 36px; margin-bottom: 30px;
+    position: relative; overflow: hidden;
+  }
+  .hero::after {
+    content: ""; position: absolute; right: -60px; top: -60px;
+    width: 220px; height: 220px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,58,237,.5), transparent 70%);
+  }
+  .hero .tag {
+    display: inline-block; font-size: 12px; letter-spacing: .08em;
+    padding: 3px 12px; border-radius: 999px;
+    background: rgba(255,255,255,.12); color: #c7d2fe;
+    margin-bottom: 12px;
+  }
+  .hero h1 { font-size: 26px; line-height: 1.4; margin-bottom: 10px; }
+  .hero p { color: #b9c0d6; font-size: 14px; max-width: 640px; }
+  .hero .stats { display: flex; gap: 26px; margin-top: 20px; flex-wrap: wrap; }
+  .hero .stats div b { display: block; font-size: 20px; font-family: var(--mono); color: #a5b4fc; }
+  .hero .stats div span { font-size: 12px; color: #8a92ab; }
+
+  /* ========== 章节 ========== */
+  section { scroll-margin-top: 20px; margin-bottom: 44px; }
+  .sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .sec-head .ico {
+    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sec-head h2 { font-size: 20px; }
+  .sec-head p { font-size: 12.5px; color: var(--ink-3); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px 24px; margin-bottom: 16px;
+  }
+  .card h3 { font-size: 15.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .card h3 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .card p, .card li { color: var(--ink-2); }
+  .card ul { padding-left: 20px; }
+  .card ul li { margin: 4px 0; }
+
+  .tip { border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; padding: 12px 16px; margin: 12px 0; font-size: 14px; color: #374151; }
+  .tip b { color: var(--accent); }
+  .warn { border-left: 3px solid var(--warn); background: #fdf3e3; border-radius: 0 8px 8px 0; padding: 12px 16px; margin: 12px 0; font-size: 14px; color: #6b4a10; }
+
+  /* ========== 代码 ========== */
+  pre {
+    background: var(--code-bg); color: var(--code-ink);
+    border-radius: 10px; padding: 16px 18px; margin: 12px 0;
+    overflow-x: auto; font-size: 13px; line-height: 1.7;
+  }
+  pre code { font-family: var(--mono); background: none; color: inherit; }
+  .code-label {
+    font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+    margin-bottom: -8px; display: inline-block; margin-left: 4px;
+  }
+  code {
+    font-family: var(--mono); background: var(--accent-soft);
+    color: var(--accent); border-radius: 5px; padding: 1px 6px; font-size: 13px;
+  }
+  .k { color: #c792ea; } .s { color: #a5d6a7; } .c { color: #7d8aa0; font-style: italic; }
+  .t { color: #82aaff; } .n { color: #ffcb6b; }
+
+  /* ========== 表格 ========== */
+  .tbl-wrap { overflow-x: auto; margin: 12px 0; border: 1px solid var(--line); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--card); }
+  th {
+    background: var(--accent-soft); color: var(--accent);
+    text-align: left; padding: 10px 14px; font-weight: 600;
+    font-size: 13px; white-space: nowrap;
+  }
+  td { padding: 10px 14px; border-top: 1px solid var(--line); color: var(--ink-2); }
+  tr:hover td { background: #fafbff; }
+  td code, th code { font-size: 12px; }
+  .mono { font-family: var(--mono); font-size: 13px; }
+
+  /* ========== 架构图 / 流程图 ========== */
+  .diagram { display: flex; flex-direction: column; align-items: center; gap: 0; padding: 8px 0; }
+  .node {
+    border: 2px solid var(--accent); color: var(--accent);
+    background: var(--card); border-radius: 10px;
+    padding: 8px 20px; font-size: 14px; font-weight: 600; text-align: center;
+    white-space: nowrap;
+  }
+  .node.dark { background: var(--accent); color: #fff; }
+  .node.plain { border-color: var(--line); color: var(--ink-2); background: var(--bg); }
+  .arrow { display: flex; flex-direction: column; align-items: center; color: var(--ink-3); font-size: 12px; padding: 2px 0; }
+  .arrow i { font-style: normal; font-size: 10px; letter-spacing: .02em; }
+  .row { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin: 4px 0; }
+  .row .node { flex: 0 0 auto; }
+  .branch { display: flex; justify-content: space-around; gap: 12px; width: 100%; margin-top: 2px; }
+  .branch .node { flex: 1; white-space: normal; }
+  .label-top { font-size: 12px; color: var(--ink-3); text-align: center; margin-top: 8px; }
+
+  .steps { counter-reset: step; display: flex; flex-direction: column; gap: 6px; }
+  .steps .step {
+    counter-increment: step; position: relative; padding-left: 40px;
+    color: var(--ink-2); font-size: 14px;
+  }
+  .steps .step::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 2px;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .steps .step b { color: var(--ink); }
+
+  .pill { display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); margin: 2px 4px 2px 0; }
+
+  /* ========== 对比 ========== */
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .cmp > div { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .cmp .old { background: #fdf2f2; border-color: #f3c8c8; }
+  .cmp .new { background: #effaf5; border-color: #bfe8d6; }
+  .cmp h4 { font-size: 13.5px; margin-bottom: 8px; }
+  .cmp .old h4 { color: #b91c1c; }
+  .cmp .new h4 { color: #0e9f6e; }
+  .cmp p { font-size: 13px; color: var(--ink-2); }
+  .cmp .flow { font-family: var(--mono); font-size: 12.5px; margin: 6px 0; line-height: 1.9; }
+
+  /* ========== 阶段 / 路线 ========== */
+  .road { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+  .phase {
+    flex: 1 1 160px; border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; background: var(--card); position: relative;
+  }
+  .phase b { display: block; font-size: 14px; color: var(--ink); margin-bottom: 2px; }
+  .phase span { font-size: 12px; color: var(--ink-3); }
+  .phase .idx {
+    position: absolute; top: -9px; left: 12px;
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    background: var(--accent); color: #fff; border-radius: 999px; padding: 0 8px;
+  }
+
+  footer { text-align: center; color: var(--ink-3); font-size: 12.5px; padding: 30px 0 10px; border-top: 1px solid var(--line); margin-top: 20px; }
+
+  /* ========== 响应式 ========== */
+  @media (max-width: 900px) {
+    aside { display: none; }
+    main { padding: 20px 16px 60px; }
+    .cmp { grid-template-columns: 1fr; }
+    .hero { padding: 26px 22px; }
+    .hero h1 { font-size: 21px; }
+  }
+  @media print {
+    aside { display: none; }
+    main { padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<aside>
+  <div class="brand">
+    <span class="logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </span>
+    <div>
+      <b>AI 对话接入方案</b>
+      <span>匿名聊天系统 · Java/Spring</span>
+    </div>
+  </div>
+  <nav id="toc"></nav>
+</aside>
+
+<main>
+
+  <!-- ===== 顶部 ===== -->
+  <div class="hero">
+    <span class="tag">ARCHITECTURE PLAN</span>
+    <h1>匿名聊天系统接入 AI 对话</h1>
+    <p>把 AI 当作系统里的一个新“聊天参与者”，而不是单独造一个 AI 项目。后端负责聊天业务，AI 模型只负责生成回复，让现有架构平滑演进。</p>
+    <div class="stats">
+      <div><b>16</b><span>设计要点</span></div>
+      <div><b>3</b><span>数据库表</span></div>
+      <div><b>4</b><span>核心接口</span></div>
+      <div><b>8</b><span>学习阶段</span></div>
+    </div>
+  </div>
+
+  <!-- ===== 1 整体架构 ===== -->
+  <section id="s1">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="3" x2="9" y2="7"/><line x1="15" y1="3" x2="15" y2="7"/><line x1="3" y1="9" x2="7" y2="9"/><line x1="3" y1="15" x2="7" y2="15"/><line x1="17" y1="9" x2="21" y2="9"/><line x1="17" y1="15" x2="21" y2="15"/><line x1="9" y1="17" x2="9" y2="21"/><line x1="15" y1="17" x2="15" y2="21"/>
+        </svg>
+      </span>
+      <div><h2>一、整体架构</h2><p>第一版推荐架构：后端做业务，AI 只做生成</p></div>
+    </div>
+    <div class="card">
+      <div class="diagram">
+        <div class="node">前端</div>
+        <div class="arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <i>HTTP / SSE（AI 流式）</i>
+        </div>
+        <div class="node dark">Spring Boot</div>
+        <div class="arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        </div>
+        <div class="row">
+          <div class="node">ChatService<br><span style="font-size:12px;font-weight:400;">用户消息 / AI 消息</span></div>
+          <div class="node">ConversationService<br><span style="font-size:12px;font-weight:400;">保存上下文</span></div>
+          <div class="node">AiService<br><span style="font-size:12px;font-weight:400;">调用模型</span></div>
+        </div>
+        <div class="arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        </div>
+        <div class="node">AI 模型 API</div>
+        <div class="arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        </div>
+        <div class="row">
+          <div class="node plain">OpenAI</div>
+          <div class="node plain">Claude</div>
+          <div class="node plain">通义千问</div>
+          <div class="node plain">DeepSeek</div>
+        </div>
+      </div>
+      <div class="tip"><b>核心思想：</b>Spring 后端负责聊天业务，AI 模型只负责“生成回复”。<b>不要让前端直接调用 AI</b>——密钥、限流、上下文管理全部收口在后端。</div>
+    </div>
+  </section>
+
+  <!-- ===== 2 AiService ===== -->
+  <section id="s2">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </span>
+      <div><h2>二、AiService 接口</h2><p>第一步：一个面向业务的 AI 服务接口</p></div>
+    </div>
+    <div class="card">
+      <span class="code-label">AiService.java</span>
+<pre><code><span class="k">public interface</span> AiService {
+
+    <span class="c">// 给定会话 + 用户消息，返回 AI 回复</span>
+    String <span class="t">chat</span>(String conversationId, String message);
+}</code></pre>
+      <p>后续按需扩展，例如：</p>
+      <pre><code><span class="k">public interface</span> AiService {
+
+    String <span class="t">chat</span>(String conversationId, String message);              <span class="c">// 一次性返回</span>
+
+    <span class="k">void</span> <span class="t">chatStream</span>(String conversationId, String message,
+                         StreamListener listener);   <span class="c">// 流式输出</span>
+}</code></pre>
+      <div class="tip"><b>原则：</b>接口面向业务语义（会话、消息），不暴露具体模型细节，方便以后替换模型。</div>
+    </div>
+  </section>
+
+  <!-- ===== 3 消息模型 ===== -->
+  <section id="s3">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H5.17L4 17.17z"/><path d="M8 9h8M8 12h5"/></svg>
+      </span>
+      <div><h2>三、消息模型：AI 到底是谁</h2><p>匿名聊天系统的特殊问题——不要写死 senderUserId</p></div>
+    </div>
+    <div class="card">
+      <span class="code-label">ChatMessage.java</span>
+<pre><code><span class="k">public class</span> ChatMessage {
+
+    <span class="k">private</span> String id;
+    <span class="k">private</span> String conversationId;
+    <span class="k">private</span> String senderType;   <span class="c">// USER / AI / SYSTEM</span>
+    <span class="k">private</span> String senderId;     <span class="c">// 匿名用户ID / gpt-xxx / null</span>
+    <span class="k">private</span> String messageType;
+    <span class="k">private</span> String content;
+    <span class="k">private</span> Date createTime;
+}</code></pre>
+      <p>用 <code>senderType + senderId</code> 取代单一的 <code>senderUserId</code>：</p>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>senderType</th><th>senderId</th><th>含义</th></tr>
+          <tr><td><code>USER</code></td><td>xxx</td><td>匿名用户</td></tr>
+          <tr><td><code>AI</code></td><td>gpt-xxx</td><td>AI 角色</td></tr>
+          <tr><td><code>SYSTEM</code></td><td>null</td><td>系统消息</td></tr>
+          <tr><td><code>ROBOT</code></td><td>bot-xxx</td><td>机器人（预留）</td></tr>
+        </table>
+      </div>
+      <p>这样用户 A ↔ 用户 B、用户 A ↔ AI、用户 A ↔ 用户 B ↔ AI 都能用同一张消息表表达。一条会话示例：</p>
+<pre><code>conversationId = abc123
+
+<span class="t">USER</span> : 你好
+<span class="t">AI</span>   : 你好，有什么可以帮你？
+<span class="t">USER</span> : Java 里面什么是 Spring？
+<span class="t">AI</span>   : Spring 是一个 Java 应用开发框架……</code></pre>
+    </div>
+  </section>
+
+  <!-- ===== 4 上下文 ===== -->
+  <section id="s4">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+      </span>
+      <div><h2>四、上下文才是关键</h2><p>单句发给 AI，它不知道“它”是谁</p></div>
+    </div>
+    <div class="card">
+      <p>连续提问示例：</p>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>轮次</th><th>用户</th><th>AI</th></tr>
+          <tr><td>1</td><td>什么是 Spring？</td><td>Spring 是 Java 生态中的框架。</td></tr>
+          <tr><td>2</td><td>它和 Spring Boot 有什么区别？</td><td>Spring Boot 是在 Spring 基础上……</td></tr>
+        </table>
+      </div>
+      <p>第二句单独发给 AI，AI 不知道“它”指代谁，因此必须把历史消息一起发送：</p>
+<pre><code>[
+  { <span class="s">"role"</span>: <span class="s">"user"</span>,      <span class="s">"content"</span>: <span class="s">"什么是Spring？"</span> },
+  { <span class="s">"role"</span>: <span class="s">"assistant"</span>, <span class="s">"content"</span>: <span class="s">"Spring是Java生态中的框架。"</span> },
+  { <span class="s">"role"</span>: <span class="s">"user"</span>,      <span class="s">"content"</span>: <span class="s">"它和Spring Boot有什么区别？"</span> }
+]</code></pre>
+      <div class="diagram" style="flex-direction:row;flex-wrap:wrap;justify-content:center;gap:10px;">
+        <div class="node plain">Conversation</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node plain">Message History</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node plain">AiService</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node plain">LLM</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 5 第一版上下文方案 ===== -->
+  <section id="s5">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
+      </span>
+      <div><h2>五、第一版上下文方案</h2><p>不要一开始就实现复杂上下文算法</p></div>
+    </div>
+    <div class="card">
+      <p>最简单可靠的做法：每次发送时查询最近 N 条消息，组装 Prompt。</p>
+      <div class="steps">
+        <div class="step">用户<b> 发送消息</b></div>
+        <div class="step"><b> 查询最近 N 条消息</b>（如 20 条）</div>
+        <div class="step"><b> 组装 Prompt</b>（System + History + 当前问题）</div>
+        <div class="step"><b> 调用 AI</b></div>
+        <div class="step"><b> 保存 AI 回复</b></div>
+      </div>
+      <span class="code-label">ServiceImpl 核心逻辑</span>
+<pre><code>List&lt;ChatMessage&gt; history =
+        messageMapper.<span class="t">selectRecentMessages</span>(conversationId, 20);
+
+List&lt;AiMessage&gt; messages = <span class="k">new</span> ArrayList&lt;&gt;();
+messages.<span class="t">add</span>(systemMessage);                <span class="c">// 系统设定</span>
+<span class="k">for</span> (ChatMessage message : history) {
+    messages.<span class="t">add</span>(<span class="t">convert</span>(message));         <span class="c">// 历史消息</span>
+}
+messages.<span class="t">add</span>(userMessage);                   <span class="c">// 当前问题</span></code></pre>
+      <div class="tip"><b>这就是一个可用的 AI 聊天了。</b>先把链路跑通，再谈优化。</div>
+
+      <h3 style="margin-top:22px;"><span class="dot"></span>进阶：历史摘要 + 最近消息</h3>
+      <p>会话拉长后，全量历史会让 <b>token 成本与延迟持续上涨</b>。升级做法是<b>历史摘要 + 最近消息</b>：把早于窗口的历史压缩成一段摘要（Conversation Summary），窗口内的最近消息原样保留，调用 AI 厂商时按"角色设定 + 历史摘要 + 最近消息 + 当前问题"组装 messages。</p>
+      <div class="diagram" style="flex-direction:row;flex-wrap:wrap;justify-content:center;gap:10px;">
+        <div class="node plain">System Prompt</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node plain">历史摘要</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node plain">最近 N 条消息</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node plain">当前问题</div>
+      </div>
+      <span class="code-label">调用 AI 厂商时的 messages 数组</span>
+<pre><code>[
+  { <span class="s">"role"</span>: <span class="s">"system"</span>,   <span class="s">"content"</span>: <span class="s">"你是匿名聊天助手。\n\n[历史摘要]\n用户是一名 Java 后端开发人员，正在开发匿名聊天系统，使用 Spring Boot + MySQL + Redis。"</span> },
+  { <span class="s">"role"</span>: <span class="s">"user"</span>,      <span class="s">"content"</span>: <span class="s">"最近的某条消息"</span> },
+  { <span class="s">"role"</span>: <span class="s">"assistant"</span>, <span class="s">"content"</span>: <span class="s">"对应的 AI 回复"</span> },
+  <span class="c">// …… 最近 N 条消息 ……</span>
+  { <span class="s">"role"</span>: <span class="s">"user"</span>,      <span class="s">"content"</span>: <span class="s">"当前问题"</span> }
+]</code></pre>
+      <div class="steps">
+        <div class="step">消息数<b> 超过阈值</b>（如 50 条）时，把窗口外最早的消息交给模型生成摘要</div>
+        <div class="step"><b> 摘要与最近消息分开放</b>：conversation.summary 字段 + chat_message 表</div>
+        <div class="step">再次调用 AI 时，<b> 按"角色设定 + 历史摘要 + 最近 N 条 + 当前问题"组装 messages</b></div>
+        <div class="step"><b> 每轮对话结束后滚动更新摘要</b></div>
+      </div>
+      <span class="code-label">ServiceImpl 核心逻辑</span>
+<pre><code>String summary = conversation.<span class="t">getSummary</span>();        <span class="c">// 历史摘要（滚动更新）</span>
+List&lt;ChatMessage&gt; recent =
+        messageMapper.<span class="t">selectRecentMessages</span>(conversationId, 20);
+
+List&lt;AiMessage&gt; messages = <span class="k">new</span> ArrayList&lt;&gt;();
+messages.<span class="t">add</span>(AiMessage.<span class="t">system</span>(
+        systemPrompt + <span class="s">"\n\n[历史摘要]\n"</span> + summary));
+<span class="k">for</span> (ChatMessage message : recent) {
+    messages.<span class="t">add</span>(<span class="t">convert</span>(message));        <span class="c">// 最近消息</span>
+}
+messages.<span class="t">add</span>(userMessage);                  <span class="c">// 当前问题</span></code></pre>
+      <div class="tip"><b>效果：</b>模型既能看到久远上下文（摘要），又能拿到最近细节（最近 N 条），token 成本稳定在可控区间。</div>
+    </div>
+  </section>
+
+  <!-- ===== 6 流式输出 ===== -->
+  <section id="s6">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </span>
+      <div><h2>六、Streaming 流式输出</h2><p>聊天体验的关键，放在基础链路跑通之后</p></div>
+    </div>
+    <div class="card">
+      <div class="cmp">
+        <div class="old">
+          <h4>普通模式（一次性返回）</h4>
+          <div class="flow">用户发送 → Spring → AI<br>等待 5 秒 ↓<br>一次性返回：<br>"你好，我是AI，很高兴认识你..."</div>
+          <p>用户长时间看着空白等待，体验较差。</p>
+        </div>
+        <div class="new">
+          <h4>流式模式（逐字输出）</h4>
+          <div class="flow">用户发送 → Spring → AI<br>↓<br>"你好"<br>↓<br>"你好，我是"<br>↓<br>"你好，我是AI，很高兴认识你▌"</div>
+          <p>前端看到的就是 ChatGPT 那种打字机效果。</p>
+        </div>
+      </div>
+      <p style="margin-top:12px;"><b>通信方式：SSE（Server-Sent Events）。</b>AI 回复是"服务端 → 客户端"的单向流，SSE 基于 HTTP、浏览器原生 <code>EventSource</code> 即可接收、断线自动重连，比 WebSocket 更轻，无需握手与额外协议。</p>
+      <div class="diagram">
+        <div class="node">前端 EventSource</div>
+        <div class="arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <i>POST /api/chat/ai/stream</i>
+        </div>
+        <div class="node dark">Spring Boot · SseEmitter</div>
+        <div class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="node">AiProvider</div>
+        <div class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="node">AI 模型 API（stream）</div>
+        <div class="arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          <i>data: 增量文本</i>
+        </div>
+        <div class="node plain">前端逐段拼接 → 打字机效果</div>
+      </div>
+      <span class="code-label">前端：EventSource 接收（Vue 示例）</span>
+<pre><code><span class="c">// EventSource 基于 GET；若需 POST 传参，可用 fetch + ReadableStream 流式读取</span>
+<span class="k">const</span> es = <span class="k">new</span> EventSource(<span class="s">`/api/chat/ai/stream?conversationId=</span>${conversationId}<span class="s">&message=</span>${encodeURIComponent(message)}<span class="s">`</span>);
+
+es.<span class="t">onmessage</span> = (event) =&gt; {
+    answer += event.data;          <span class="c">// 每段增量直接拼到回复气泡上</span>
+};
+es.<span class="t">onerror</span> = () =&gt; { es.close(); };   <span class="c">// 重连由 EventSource 内置处理</span></code></pre>
+      <div class="tip"><b>后端逐段落库，前端只负责拼字。</b>流式推给前端的同时，后端把完整回复写入 chat_message，刷新后仍能看到完整对话。</div>
+    </div>
+  </section>
+
+  <!-- ===== 7 分层结构 ===== -->
+  <section id="s7">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </span>
+      <div><h2>七、推荐分层结构</h2><p>AiProvider 抽象层，让模型切换不动业务代码</p></div>
+    </div>
+    <div class="card">
+      <div class="diagram">
+        <div class="node">controller</div>
+        <div class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="node dark">ChatService</div>
+        <div class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="row">
+          <div class="node">ConversationService</div>
+          <div class="node">MessageService</div>
+          <div class="node">AiService</div>
+        </div>
+        <div class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="node">AiProvider</div>
+        <div class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="row">
+          <div class="node plain">OpenAI</div>
+          <div class="node plain">DeepSeek</div>
+          <div class="node plain">Qwen</div>
+        </div>
+      </div>
+      <span class="code-label">AiProvider.java</span>
+<pre><code><span class="k">public interface</span> AiProvider {
+    AiResponse <span class="t">chat</span>(AiRequest request);
+}</code></pre>
+      <span class="code-label">AiServiceImpl.java</span>
+<pre><code>@Service
+<span class="k">public class</span> AiServiceImpl <span class="k">implements</span> AiService {
+
+    @Resource
+    <span class="k">private</span> AiProvider aiProvider;
+
+    @Override
+    <span class="k">public</span> String <span class="t">chat</span>(String conversationId, String message) {
+        <span class="c">// 1. 查询上下文</span>
+        <span class="c">// 2. 调用 aiProvider</span>
+        <span class="c">// 3. 保存消息</span>
+        <span class="c">// 4. 返回结果</span>
+        <span class="k">return</span> <span class="k">null</span>;
+    }
+}</code></pre>
+      <div class="tip"><b>这个设计非常重要。</b>以后从模型 A 切换到模型 B，甚至从“普通聊天 → AI”扩展出 AI 客服 / AI 助手 / AI 角色 / AI 群聊，都不会把业务代码搞乱——只需要新增一个 Provider 实现。</div>
+    </div>
+  </section>
+
+  <!-- ===== 8 AI 角色 ===== -->
+  <section id="s8">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </span>
+      <div><h2>八、AI 角色设计</h2><p>程序员 AI、游戏 AI、客服 AI……Prompt 不要写死在代码里</p></div>
+    </div>
+    <div class="card">
+      <p>独立的 <code>AiAgent</code>（AI 角色）表：</p>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>字段</th><th>说明</th></tr>
+          <tr><td><code>id</code></td><td>角色主键</td></tr>
+          <tr><td><code>name</code></td><td>角色名称，如：程序员助手</td></tr>
+          <tr><td><code>code</code></td><td>角色编码，如：<span class="mono">coder</span></td></tr>
+          <tr><td><code>model</code></td><td>使用的模型，如：<span class="mono">deepseek</span></td></tr>
+          <tr><td><code>systemPrompt</code></td><td>系统提示词，如：你是一名专业 Java 程序员…</td></tr>
+          <tr><td><code>temperature</code></td><td>采样温度</td></tr>
+          <tr><td><code>maxTokens</code></td><td>最大输出 token</td></tr>
+          <tr><td><code>enabled</code></td><td>是否启用</td></tr>
+        </table>
+      </div>
+      <div class="diagram" style="flex-direction:row;flex-wrap:wrap;justify-content:center;gap:10px;">
+        <div class="node">用户</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node">选择 AI</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node">AiAgent</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node">systemPrompt</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node">AiProvider</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node">模型</div>
+      </div>
+      <p style="margin-top:10px;">前端甚至可以做“选择聊天对象”：</p>
+      <p><span class="pill">Java 助手</span><span class="pill">游戏助手</span><span class="pill">英语老师</span><span class="pill">AI 客服</span></p>
+    </div>
+  </section>
+
+  <!-- ===== 9 Redis ===== -->
+  <section id="s9">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      </span>
+      <div><h2>九、Redis 会话状态</h2><p>MySQL 存永久记录，Redis 存热上下文</p></div>
+    </div>
+    <div class="card">
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>存储</th><th>职责</th></tr>
+          <tr><td><b>MySQL</b></td><td>永久聊天记录</td></tr>
+          <tr><td><b>Redis</b></td><td>最近上下文 · 限流 · AI 请求状态 · 流式输出状态</td></tr>
+        </table>
+      </div>
+      <p>关键 Key 设计：</p>
+      <pre><code>ai:conversation:{conversationId}      <span class="c"># 保存最近 20 ~ 50 条消息</span></code></pre>
+      <div class="tip"><b>好处：</b>每次调用 AI 直接从 Redis 取热上下文，不必从 MySQL 查询大量数据；流式输出中断状态、限流计数也放这里，天然带过期时间。</div>
+    </div>
+  </section>
+
+  <!-- ===== 10 Token 控制 ===== -->
+  <section id="s10">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      </span>
+      <div><h2>十、Token 控制</h2><p>上下文越长，成本与延迟越高，不能无限塞历史</p></div>
+    </div>
+    <div class="card">
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>轮次</th><th>上下文 Token 量</th></tr>
+          <tr><td>第 1 轮</td><td><span class="mono">100 tokens</span></td></tr>
+          <tr><td>第 10 轮</td><td><span class="mono">2000 tokens</span></td></tr>
+          <tr><td>第 50 轮</td><td><span class="mono">10000 tokens</span></td></tr>
+          <tr><td>第 100 轮</td><td><span class="mono">30000 tokens</span></td></tr>
+        </table>
+      </div>
+      <p><b>第一版：</b>只取最近 20 条消息。</p>
+      <p><b>进阶：</b>最近消息 + 历史摘要。例如：</p>
+      <pre><code>历史摘要：
+用户是一名 Java 后端开发人员，
+正在开发匿名聊天系统，
+使用 Spring Boot + MySQL + Redis。
+目前正在增加 AI 聊天功能。</code></pre>
+      <p>最终组装为成熟的 Prompt 结构：</p>
+<pre><code><span class="c">System Prompt</span>
++ <span class="c">Conversation Summary</span>   <span class="c">（历史摘要）</span>
++ <span class="c">最近 20 条消息</span>
++ <span class="c">当前问题</span></code></pre>
+    </div>
+  </section>
+
+  <!-- ===== 11 学习路线 ===== -->
+  <section id="s11">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </span>
+      <div><h2>十一、学习路线</h2><p>不要一口气学一堆 AI 知识，按阶段推进</p></div>
+    </div>
+    <div class="card">
+      <div class="road">
+        <div class="phase"><span class="idx">1</span><b>Spring Boot 调用 AI API</b><span>先跑通一次模型调用</span></div>
+        <div class="phase"><span class="idx">2</span><b>聊天上下文</b><span>多轮历史组装</span></div>
+        <div class="phase"><span class="idx">3</span><b>Streaming</b><span>流式输出</span></div>
+        <div class="phase"><span class="idx">4</span><b>Token / 上下文管理</b><span>截断、摘要、限流</span></div>
+        <div class="phase"><span class="idx">5</span><b>Prompt</b><span>角色与提示词工程</span></div>
+        <div class="phase"><span class="idx">6</span><b>Function Calling / Tool</b><span>模型调用工具</span></div>
+        <div class="phase"><span class="idx">7</span><b>RAG</b><span>知识库检索增强</span></div>
+        <div class="phase"><span class="idx">8</span><b>Agent</b><span>自主规划与执行</span></div>
+      </div>
+      <div class="warn"><b>当前阶段只做 MVP：</b>先不要上 RAG、Agent、向量数据库。把“创建会话 → 发消息 → 调模型 → 存回复”这条链路跑通即可。</div>
+    </div>
+  </section>
+
+  <!-- ===== 12 MVP 与 API ===== -->
+  <section id="s12">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+      </span>
+      <div><h2>十二、MVP 落地与 API 设计</h2><p>最小可用闭环，先跑通再升级</p></div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>MVP 流程</h3>
+      <div class="steps">
+        <div class="step">匿名用户<b> 创建 AI 会话</b></div>
+        <div class="step"><b> 发送消息</b> → Spring Boot → AiService → AI API</div>
+        <div class="step"><b> AI 回复</b></div>
+        <div class="step"><b> 保存消息</b></div>
+      </div>
+      <h3 style="margin-top:18px;"><span class="dot"></span>第一版 API</h3>
+<pre><code><span class="c"># 创建 AI 会话</span>
+POST <span class="t">/api/chat/ai/create</span>
+
+<span class="c"># 发送消息（一次性返回）</span>
+POST <span class="t">/api/chat/ai/send</span>
+
+<span class="c"># 历史记录</span>
+GET  <span class="t">/api/chat/ai/history</span>
+
+<span class="c"># 之后升级：流式输出</span>
+POST <span class="t">/api/chat/ai/stream</span></code></pre>
+      <h3 style="margin-top:18px;"><span class="dot"></span>最终技术栈</h3>
+      <div class="diagram" style="flex-direction:row;flex-wrap:wrap;justify-content:center;gap:8px;">
+        <div class="node">Vue</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node">SSE / EventSource</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node dark">Spring Boot</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node">ChatService</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node">AiService</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node">AiProvider</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="node plain">大模型 API</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 13 如何通过调用 API 实现对话 ===== -->
+  <section id="s13">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      </span>
+      <div><h2>十三、如何通过调用 API 实现对话</h2><p>一次真实对话的完整链路：从 HTTP 请求到拿到回复</p></div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>整体时序</h3>
+      <div class="steps">
+        <div class="step">前端<b> 发送消息</b> → POST /api/chat/ai/send</div>
+        <div class="step"><b> ChatService</b> 查最近 N 条历史，组装 messages 数组</div>
+        <div class="step"><b> AiService → AiProvider</b> 用 RestTemplate 调模型 API</div>
+        <div class="step"><b> 模型 API</b> 返回 choices[0].message.content</div>
+        <div class="step"><b> 保存消息</b> → 把 AI 回复返回给前端</div>
+      </div>
+      <div class="diagram">
+        <div class="node">前端</div>
+        <div class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></div>
+        <div class="node dark">Spring Boot /api/chat/ai/send</div>
+        <div class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="row">
+          <div class="node">ChatService</div>
+          <div class="node">AiService</div>
+          <div class="node">AiProvider</div>
+        </div>
+        <div class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="node">POST /chat/completions</div>
+        <div class="arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="row">
+          <div class="node plain">DeepSeek</div>
+          <div class="node plain">OpenAI</div>
+          <div class="node plain">通义千问</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>1. 配置：密钥放在后端环境变量</h3>
+      <span class="code-label">application.yml</span>
+<pre><code>ai:
+  provider: deepseek
+  deepseek:
+    api-key: ${DEEPSEEK_API_KEY}      <span class="c"># 不要写死在代码里</span>
+    base-url: https://api.deepseek.com
+    model: deepseek-chat
+  openai:
+    api-key: ${OPENAI_API_KEY}
+    base-url: https://api.openai.com/v1
+    model: gpt-4o-mini</code></pre>
+      <div class="warn"><b>密钥安全：</b>API Key 只存在后端环境变量，前端永远接触不到，也不要提交到 Git。</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>2. 一次性对话：AiProvider 的真实实现</h3>
+      <span class="code-label">DeepSeekProvider.java</span>
+<pre><code>@Service
+<span class="k">public class</span> DeepSeekProvider <span class="k">implements</span> AiProvider {
+
+    @Value("${ai.deepseek.api-key}") <span class="k">private</span> String apiKey;
+    @Value("${ai.deepseek.base-url}") <span class="k">private</span> String baseUrl;
+    @Value("${ai.deepseek.model}")   <span class="k">private</span> String model;
+
+    <span class="k">private final</span> RestTemplate restTemplate = <span class="k">new</span> RestTemplate();
+
+    @Override
+    <span class="k">public</span> AiResponse <span class="t">chat</span>(AiRequest request) {
+        <span class="c">// 1. 组装请求体（OpenAI 兼容格式）</span>
+        Map&lt;String, Object&gt; body = <span class="k">new</span> HashMap&lt;&gt;();
+        body.<span class="t">put</span>("model", model);
+        body.<span class="t">put</span>("messages", request.getMessages());
+        body.<span class="t">put</span>("temperature", request.getTemperature());
+
+        <span class="c">// 2. 设置鉴权头</span>
+        HttpHeaders headers = <span class="k">new</span> HttpHeaders();
+        headers.<span class="t">setContentType</span>(MediaType.APPLICATION_JSON);
+        headers.<span class="t">setBearerAuth</span>(apiKey);     <span class="c">// Authorization: Bearer xxx</span>
+
+        HttpEntity&lt;Map&lt;String, Object&gt;&gt; entity =
+                <span class="k">new</span> HttpEntity&lt;&gt;(body, headers);
+
+        <span class="c">// 3. 发起 POST</span>
+        String url = baseUrl + <span class="s">"/chat/completions"</span>;
+        Map resp = restTemplate.<span class="t">postForObject</span>(url, entity, Map.class);
+
+        <span class="c">// 4. 解析回复：choices[0].message.content</span>
+        List choices = (List) resp.<span class="t">get</span>("choices");
+        Map first = (Map) choices.<span class="t">get</span>(0);
+        Map message = (Map) first.<span class="t">get</span>("message");
+        <span class="k">return</span> AiResponse.<span class="t">of</span>((String) message.<span class="t">get</span>("content"));
+    }
+}</code></pre>
+      <div class="tip"><b>关键就在 messages 数组：</b>role 只有 system / user / assistant 三种，把历史消息按顺序放进去，模型就能"记住"上下文。</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>3. 请求与响应长什么样</h3>
+      <div class="cmp">
+        <div class="new">
+          <h4>请求 Request</h4>
+          <div class="flow">POST /chat/completions<br>{ "model": "deepseek-chat",<br>  "messages": [<br>    { "role": "system", "content": "你是匿名聊天助手" },<br>    { "role": "user", "content": "你好" }<br>  ] }</div>
+        </div>
+        <div class="new">
+          <h4>响应 Response</h4>
+          <div class="flow">{ "choices": [<br>  { "message": {<br>    "role": "assistant",<br>    "content": "你好，有什么可以帮你？"<br>  } }<br>] }</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>4. 流式对话：逐字输出（SSE）</h3>
+      <p>后端用 <code>SseEmitter</code> + <code>WebClient</code> 把模型返回的增量文本一段段推给前端：</p>
+      <span class="code-label">ChatController.java</span>
+<pre><code>@PostMapping(value = <span class="s">"/api/chat/ai/stream"</span>,
+        produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+<span class="k">public</span> SseEmitter <span class="t">stream</span>(@RequestBody SendRequest req) {
+    SseEmitter emitter = <span class="k">new</span> SseEmitter(0L);   <span class="c">// 不设超时</span>
+    aiService.<span class="t">chatStream</span>(req.getConversationId(), req.getMessage(), emitter);
+    <span class="k">return</span> emitter;
+}</code></pre>
+      <span class="code-label">AiService 流式实现（WebClient）</span>
+<pre><code>WebClient client = WebClient.builder()
+        .baseUrl(baseUrl)
+        .defaultHeader(<span class="s">"Authorization"</span>, <span class="s">"Bearer "</span> + apiKey)
+        .build();
+
+client.post()
+    .uri(<span class="s">"/chat/completions"</span>)
+    .bodyValue(body)
+    .accept(MediaType.TEXT_EVENT_STREAM)
+    .retrieve()
+    .bodyToFlux(String.class)          <span class="c">// 每个 SSE 事件一个字符串</span>
+    .<span class="t">subscribe</span>(chunk -&gt; {
+        <span class="c">// 解析 delta.content 并推给前端</span>
+        emitter.send(SseEmitter.event().data(content));
+    }, emitter::completeWithError, emitter::complete);</code></pre>
+      <div class="tip"><b>前端只需用 EventSource 监听 message 事件</b>（见第六节）即可实时拼字，得到"打字机"效果。</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>5. 不同模型的接入差异</h3>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>平台</th><th>base-url</th><th>鉴权</th><th>OpenAI 兼容</th></tr>
+          <tr><td>DeepSeek</td><td>https://api.deepseek.com</td><td>Bearer</td><td>✓</td></tr>
+          <tr><td>OpenAI</td><td>https://api.openai.com/v1</td><td>Bearer</td><td>原生</td></tr>
+          <tr><td>通义千问</td><td>https://dashscope.aliyuncs.com</td><td>Bearer / API-KEY</td><td>✓</td></tr>
+        </table>
+      </div>
+      <p>因为都走 OpenAI 兼容格式，<b>换模型只需改 AiProvider 里的 base-url / api-key / model</b>，业务代码（ChatService）完全不用动。</p>
+      <div class="tip"><b>这就是第 7 节 AiProvider 抽象的价值。</b></div>
+    </div>
+  </section>
+
+  <!-- ===== 14 数据库表设计 ===== -->
+  <section id="s14">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0 1.7 3.6 3 8 3s8-1.3 8-3-3.6-3-8-3-8 1.3-8 3z"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+      </span>
+      <div><h2>十四、数据库表设计</h2><p>会话表 + 消息表 + AI 角色表</p></div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>ai_conversation（会话表）</h3>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td>id</td><td>bigint</td><td>主键</td></tr>
+          <tr><td>user_id</td><td>varchar</td><td>发起用户（匿名 ID）</td></tr>
+          <tr><td>agent_id</td><td>bigint</td><td>关联 AI 角色（可空=通用 AI）</td></tr>
+          <tr><td>title</td><td>varchar</td><td>会话标题</td></tr>
+          <tr><td>status</td><td>tinyint</td><td>0 关闭 / 1 进行中</td></tr>
+          <tr><td>create_time</td><td>datetime</td><td>创建时间</td></tr>
+        </table>
+      </div>
+      <h3><span class="dot"></span>chat_message（消息表）</h3>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td>id</td><td>bigint</td><td>主键</td></tr>
+          <tr><td>conversation_id</td><td>varchar</td><td>会话 ID</td></tr>
+          <tr><td>sender_type</td><td>varchar</td><td>USER / AI / SYSTEM</td></tr>
+          <tr><td>sender_id</td><td>varchar</td><td>发送者 ID（用户或 AI 编码）</td></tr>
+          <tr><td>message_type</td><td>varchar</td><td>text / image / …</td></tr>
+          <tr><td>content</td><td>text</td><td>消息内容</td></tr>
+          <tr><td>create_time</td><td>datetime</td><td>创建时间</td></tr>
+        </table>
+      </div>
+      <h3><span class="dot"></span>ai_agent（AI 角色表）</h3>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td>id</td><td>bigint</td><td>主键</td></tr>
+          <tr><td>name</td><td>varchar</td><td>角色名称</td></tr>
+          <tr><td>code</td><td>varchar</td><td>角色编码</td></tr>
+          <tr><td>model</td><td>varchar</td><td>模型标识</td></tr>
+          <tr><td>system_prompt</td><td>text</td><td>系统提示词</td></tr>
+          <tr><td>temperature</td><td>decimal</td><td>采样温度</td></tr>
+          <tr><td>max_tokens</td><td>int</td><td>最大输出 token</td></tr>
+          <tr><td>enabled</td><td>tinyint</td><td>是否启用</td></tr>
+          <tr><td>user_id</td><td>bigint</td><td>创建者（null=系统预置角色）</td></tr>
+          <tr><td>avatar</td><td>varchar</td><td>头像 emoji / 图片 URL</td></tr>
+          <tr><td>is_system</td><td>tinyint</td><td>1 系统预置 / 0 用户自建</td></tr>
+          <tr><td>api_provider</td><td>varchar</td><td>厂商标识 deepseek / openai / qwen（留空=系统默认）</td></tr>
+          <tr><td>api_base_url</td><td>varchar</td><td>厂商 base-url（留空=系统默认）</td></tr>
+          <tr><td>api_key_enc</td><td>varchar</td><td>用户自带的 API Key（AES 加密后的字符串，留空=系统默认 Key）</td></tr>
+        </table>
+      </div>
+      <div class="tip"><b>核心演进路径：</b>从现有匿名聊天系统直接长出 AI 能力，而不是单独造一个 AI 项目。先实现 MVP，再逐步升级流式、上下文管理、AI 角色、Agent。</div>
+    </div>
+  </section>
+
+  <!-- ===== 15 用户自建角色与角色聊天 ===== -->
+  <section id="s15">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+      </span>
+      <div><h2>十五、用户自建角色与角色聊天</h2><p>让每个用户都能创建自己的 AI 角色，保存上下文，长期与角色对话</p></div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>角色从"系统预置"升级为"人人可建"</h3>
+      <p>在 <code>ai_agent</code> 表上增加归属与展示字段（见 14 节数据库），区分系统角色与用户自建角色：</p>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>角色类型</th><th>判断</th><th>可见性</th></tr>
+          <tr><td>系统预置角色</td><td><code>is_system = 1</code>，user_id 为 null</td><td>所有用户可见可用</td></tr>
+          <tr><td>用户自建角色</td><td><code>is_system = 0</code>，user_id = 创建者</td><td>仅创建者可见可用</td></tr>
+        </table>
+      </div>
+      <div class="tip"><b>权限规则：</b>用户只能编辑 / 删除自己创建的角色，不能改系统角色。删除角色不影响历史会话（会话仍保留消息）。<b>注意：新建角色不是人人可用，需要 <code>ai:agent:create</code> 权限，详见 16 节。</b></div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>创建角色的 API</h3>
+      <span class="code-label">AgentController.java</span>
+<pre><code>GET    /api/ai/agent/list        <span class="c"># 我的角色 + 系统角色</span>
+POST   /api/ai/agent/create      <span class="c"># 创建角色</span>
+PUT    /api/ai/agent/{id}        <span class="c"># 编辑角色（仅本人）</span>
+DELETE /api/ai/agent/{id}        <span class="c"># 删除角色（仅本人）</span></code></pre>
+      <span class="code-label">POST /api/ai/agent/create 请求体</span>
+<pre><code>{
+  <span class="s">"name"</span>: <span class="s">"英语老师"</span>,
+  <span class="s">"avatar"</span>: <span class="s">"🎓"</span>,
+  <span class="s">"model"</span>: <span class="s">"deepseek-chat"</span>,
+  <span class="s">"systemPrompt"</span>: <span class="s">"你是一名专业英语老师，请用简单英语和我对话，并纠正我的语法错误。"</span>,
+  <span class="s">"temperature"</span>: 0.7,
+  <span class="s">"provider"</span>: <span class="s">"deepseek"</span>,                   <span class="c">// 留空 = 系统默认厂商</span>
+  <span class="s">"apiBaseUrl"</span>: <span class="s">"https://api.deepseek.com"</span>,   <span class="c">// 留空 = 系统默认</span>
+  <span class="s">"apiKey"</span>: <span class="s">"sk-xxx"</span>                          <span class="c">// 用户自己的 Key，留空 = 系统默认</span>
+}</code></pre>
+      <p>Controller 要点：创建时写入当前登录用户 id；编辑 / 删除前校验 <code>agent.user_id == 当前用户</code>，否则返回 403；<code>apiKey</code> 加密后入库，列表 / 编辑返回时脱敏（只显示尾号）。</p>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>自带 API Key：用自己的 Key 调厂商</h3>
+      <p>用户可以在创建角色时绑定自己的<b>厂商 API Key</b>，系统用该 Key 调用模型，费用由用户承担、不占用系统配额。</p>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>字段</th><th>说明</th></tr>
+          <tr><td><code>provider</code></td><td>厂商标识：<span class="mono">deepseek</span> / <span class="mono">openai</span> / <span class="mono">qwen</span>，留空 = 系统默认厂商</td></tr>
+          <tr><td><code>apiBaseUrl</code></td><td>厂商 base-url，留空 = 系统默认</td></tr>
+          <tr><td><code>apiKey</code></td><td>用户自己的 Key，留空 = 系统默认 Key</td></tr>
+        </table>
+      </div>
+      <div class="warn"><b>Key 安全：</b>apiKey <b>加密后</b>写入 <code>ai_agent.api_key_enc</code>（AES / Jasypt），不存明文；列表与编辑接口<b>脱敏返回</b>（只显示尾号），Key 一经保存不可再回显原文。前端表单也只做"覆盖 / 清空"操作，不展示旧值。</div>
+      <div class="tip"><b>调用优先级：</b>角色自带 Key &gt; 系统默认 Key（<code>application.yml</code>）。系统角色、未填 Key 的角色继续走系统默认配置，行为不变。示例见下方"与角色聊天" ChatService 第 3 步。</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>API Key 加密与调用链路</h3>
+      <p>用户 Key 以 <b>AES 加密后的字符串</b>落库（<code>ai_agent.api_key_enc</code>），只有真正调用 AI 的那一刻才解密，全链路不出现明文。</p>
+      <div class="diagram">
+        <div class="node plain">ai_agent.api_key_enc（AES 密文）</div>
+        <div class="arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <i>AES 解密</i>
+        </div>
+        <div class="node">crypto.decrypt()</div>
+        <div class="arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <i>内存中携带</i>
+        </div>
+        <div class="node dark">调用 AI（AiProvider → 模型 API）</div>
+        <div class="arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <i>用完即弃</i>
+        </div>
+        <div class="node plain">不留存 · 不打日志</div>
+      </div>
+      <span class="code-label">CryptoService（AES 加解密）</span>
+<pre><code>@Component
+<span class="k">public class</span> CryptoService {
+
+    <span class="k">private final</span> SecretKey aesKey;   <span class="c">// 由环境变量 AES_KEY 初始化，不硬编码</span>
+
+    <span class="k">public</span> String <span class="t">encrypt</span>(String plain) {
+        <span class="c">// AES/GCM 加密 → Base64 密文，写库 api_key_enc</span>
+        <span class="k">return</span> <span class="t">base64</span>(aesGcm.<span class="t">seal</span>(plain.getBytes(), aesKey));
+    }
+    <span class="k">public</span> String <span class="t">decrypt</span>(String cipher) {
+        <span class="c">// 解密只在调用 AI 前执行，结果用完即弃</span>
+        <span class="k">return new</span> String(aesGcm.<span class="t">open</span>(<span class="t">unbase64</span>(cipher), aesKey));
+    }
+}</code></pre>
+      <div class="tip"><b>调用顺序：</b>数据库读取密文 → <code>crypto.decrypt()</code> 解密 → 放进 <code>AiRequest</code> → 调厂商 API → 解密结果用完即弃（不留存、不打日志）。</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>用户 Key 的额度、安全与限流</h3>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>风险</th><th>表现</th><th>应对方案</th></tr>
+          <tr><td><b>Key 额度耗尽</b></td><td>厂商返回 <code>quota_exceeded</code> / 401 / 429</td><td>捕获错误并提示"你的 Key 额度已用完，请到角色编辑页更新"；失败计次，连续失败自动停用该角色 <code>enabled</code>，避免每条消息都报错</td></tr>
+          <tr><td><b>安全问题（Key 泄露）</b></td><td>Key 被他人盗用，产生盗刷</td><td>AES 加密落库 + 接口脱敏；提供一键"轮换 / 重置 Key"；异常调用（频次突增 / 异地）自动冻结该角色并通知用户</td></tr>
+          <tr><td><b>限流</b></td><td>单用户高频调用挤占资源 / 触发厂商限流</td><td>按用户维度限流（<span class="mono">ai:chat:rate</span> 每分钟 N 次，Redis 计数）；再按角色 Key 维度限流；超限返回 429 提示稍后再试</td></tr>
+        </table>
+      </div>
+      <div class="steps">
+        <div class="step"><b> 调用前</b>：Redis 检查用户限流 + 角色 Key 健康状态（是否已停用）</div>
+        <div class="step"><b> 调用失败</b>：区分 401（Key 失效）/ 402（额度耗尽）/ 429（限流）</div>
+        <div class="step"><b> 连续失败</b>：计数超阈值 → 自动停用角色 / 通知用户更新 Key</div>
+      </div>
+      <span class="code-label">限流 + 额度异常处理（AiServiceImpl）</span>
+<pre><code><span class="c">// 1. 调用前：用户维度限流（Redis 滑动窗口计数）</span>
+<span class="k">if</span> (!rateLimiter.<span class="t">tryAcquire</span>(userId, <span class="n">60</span>)) {
+    <span class="k">throw new</span> BizException(<span class="s">"请求过于频繁，请稍后再试"</span>);
+}
+
+<span class="c">// 2. 调用厂商，捕获 Key 相关错误</span>
+<span class="k">try</span> {
+    reply = aiProvider.<span class="t">chat</span>(req);
+} <span class="k">catch</span> (ProviderException e) {
+    <span class="c">// 401 = Key 失效 / 402 = 额度耗尽 / 429 = 限流</span>
+    <span class="k">if</span> (e.isQuotaExceeded() || e.isKeyInvalid()) {
+        failCounter.<span class="t">incr</span>(agentId);
+        <span class="k">if</span> (failCounter.<span class="t">get</span>(agentId) &gt;= <span class="n">5</span>) {
+            agentService.<span class="t">disable</span>(agentId);   <span class="c">// 连续失败自动停用角色</span>
+        }
+    }
+    <span class="k">throw</span> e;
+}</code></pre>
+      <div class="tip"><b>原则：</b>用户 Key 的额度、安全、限流责任尽量落在角色 / 用户维度，把影响隔离在角色自身，不波及系统 Key 与其他用户。</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>与角色聊天：会话绑定角色</h3>
+      <div class="steps">
+        <div class="step">前端<b> 选择一个角色</b> → POST /api/chat/ai/create { agentId }</div>
+        <div class="step"><b> 后端创建会话</b>，ai_conversation 写入 agent_id（绑定角色）</div>
+        <div class="step"><b> 发消息</b> → ChatService 加载该角色的 systemPrompt</div>
+        <div class="step"><b> 组装 Prompt</b> = 角色设定 + 会话历史 + 当前消息</div>
+        <div class="step"><b> 调模型</b> → 保存回复，返回前端</div>
+      </div>
+      <span class="code-label">ChatService.chat 核心逻辑</span>
+<pre><code>@Override
+<span class="k">public</span> String <span class="t">chat</span>(String conversationId, String message) {
+    <span class="c">// 1. 取会话绑定的角色</span>
+    Conversation conv = conversationMapper.<span class="t">getById</span>(conversationId);
+    AiAgent agent = agentMapper.<span class="t">getById</span>(conv.getAgentId());
+
+    <span class="c">// 2. 组装 messages：角色设定 + 保存的上下文 + 当前问题</span>
+    List&lt;AiMessage&gt; messages = <span class="k">new</span> ArrayList&lt;&gt;();
+    messages.<span class="t">add</span>(AiMessage.<span class="t">system</span>(agent.getSystemPrompt()));  <span class="c">// 角色人格</span>
+    messages.<span class="t">addAll</span>(<span class="t">loadHistory</span>(conversationId, 20));        <span class="c">// 上下文</span>
+    messages.<span class="t">add</span>(AiMessage.<span class="t">user</span>(message));                     <span class="c">// 当前消息</span>
+
+    <span class="c">// 3. 组装请求：角色自带 Key 优先，否则走系统默认</span>
+    AiRequest req = AiRequest.of(agent.getModel(), messages);
+    <span class="k">if</span> (StringUtils.hasText(agent.getApiKeyEnc())) {
+        req.setApiKey(crypto.<span class="t">decrypt</span>(agent.getApiKeyEnc()));  <span class="c">// 用户自己的 Key</span>
+        req.setBaseUrl(agent.getApiBaseUrl());
+        req.setProvider(agent.getApiProvider());
+    }
+    String reply = aiProvider.<span class="t">chat</span>(req);
+
+    <span class="c">// 4. 保存这条消息与回复，供下次继续</span>
+    messageService.<span class="t">saveUser</span>(conversationId, message);
+    messageService.<span class="t">saveAi</span>(conversationId, reply);
+    <span class="k">return</span> reply;
+}</code></pre>
+      <div class="tip"><b>角色设定（systemPrompt）存在角色表，不随消息重复存。</b>同一个角色可以开多个会话，每个会话独立保存上下文、互不串扰。</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>上下文保存机制</h3>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>存储</th><th>存什么</th><th>作用</th></tr>
+          <tr><td><b>MySQL</b></td><td>chat_message 全部消息 + ai_agent 角色设定</td><td>永久保存，随时恢复历史</td></tr>
+          <tr><td><b>Redis</b></td><td>ai:conv:{conversationId} 最近 20~50 条</td><td>热上下文，聊天不查库</td></tr>
+        </table>
+      </div>
+      <p>角色与会话是一对多：一个角色可开多个会话，每个会话独立保存上下文。</p>
+      <div class="diagram" style="flex-direction:row;flex-wrap:wrap;justify-content:center;gap:10px;">
+        <div class="node">英语老师</div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <div class="row">
+          <div class="node plain">会话A · 背单词</div>
+          <div class="node plain">会话B · 练口语</div>
+          <div class="node plain">会话C · 写作纠错</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>前端交互</h3>
+      <div class="steps">
+        <div class="step"><b> 角色列表</b>：「系统角色」与「我的角色」两个 Tab</div>
+        <div class="step"><b> 新建角色</b>：表单（名称 / 头像 / 角色设定 / 模型 / 温度）</div>
+        <div class="step"><b> 点击角色</b> → 进入聊天窗口，顶部显示角色头像与名称</div>
+        <div class="step"><b> 我的角色</b>：可编辑 / 下架 / 删除</div>
+      </div>
+      <p>一个角色 + 一个聊天窗口的形态：</p>
+      <p><span class="pill">🎓 英语老师</span><span class="pill">☕ Java 助手</span><span class="pill">🎮 游戏大师</span><span class="pill">＋ 新建角色</span></p>
+    </div>
+  </section>
+
+  <!-- ===== 16 权限控制 ===== -->
+  <section id="s16">
+    <div class="sec-head">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </span>
+      <div><h2>十六、权限控制：新建不是人人可用</h2><p>角色创建 / 编辑 / 删除都需要授权，普通用户默认只能使用</p></div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>权限点设计（RBAC）</h3>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>权限点</th><th>说明</th><th>默认开放给</th></tr>
+          <tr><td><code>ai:agent:create</code></td><td>创建 AI 角色</td><td>管理员（普通用户默认无）</td></tr>
+          <tr><td><code>ai:agent:edit</code></td><td>编辑 AI 角色</td><td>创建者本人 + 管理员</td></tr>
+          <tr><td><code>ai:agent:delete</code></td><td>删除 AI 角色</td><td>创建者本人 + 管理员</td></tr>
+          <tr><td><code>ai:agent:use</code></td><td>使用某角色聊天</td><td>系统角色对所有用户开放</td></tr>
+          <tr><td><code>ai:chat:send</code></td><td>发送聊天消息</td><td>所有登录用户</td></tr>
+        </table>
+      </div>
+      <div class="tip"><b>默认策略：</b>普通用户只能用（系统预置角色）聊天，<b>不能新建</b>。新建 / 编辑 / 删除都要在后台给用户或用户组分配对应权限点后才放开。</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>后端校验：权限点 + 归属双保险</h3>
+      <span class="code-label">AgentController.java</span>
+<pre><code>@RestController
+@RequestMapping(<span class="s">"/api/ai/agent"</span>)
+<span class="k">public class</span> AgentController {
+
+    <span class="c">// 1. 权限点校验：没有 ai:agent:create 直接 403</span>
+    @PostMapping(<span class="s">"/create"</span>)
+    @PreAuthorize(<span class="s">"hasPermi('ai:agent:create')"</span>)
+    <span class="k">public</span> R <span class="t">create</span>(@RequestBody CreateAgentRequest req) { ... }
+
+    <span class="c">// 2. 删除：权限点 + 归属校验（只能动自己的，管理员除外）</span>
+    @DeleteMapping(<span class="s">"/{id}"</span>)
+    @PreAuthorize(<span class="s">"hasPermi('ai:agent:delete')"</span>)
+    <span class="k">public</span> R <span class="t">delete</span>(@PathVariable Long id) {
+        AiAgent agent = agentService.<span class="t">getById</span>(id);
+        <span class="k">if</span> (!isAdmin() &amp;&amp; !agent.getUserId().equals(loginUserId())) {
+            <span class="k">return</span> R.fail(<span class="s">"无权删除他人创建的角色"</span>);
+        }
+        <span class="k">return</span> agentService.<span class="t">remove</span>(id);
+    }
+}</code></pre>
+      <div class="warn"><b>前端隐藏按钮 ≠ 安全：</b>真正的权限控制必须落在后端，前端只是体验层，直接调接口也要被拒。</div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>前端配合</h3>
+      <div class="steps">
+        <div class="step">登录后<b> 拉取当前用户权限点</b>：GET /api/auth/perms</div>
+        <div class="step">无 <code>ai:agent:create</code> → <b>不显示</b>「新建角色」按钮</div>
+        <div class="step">有权限 → 显示入口，点击后正常创建</div>
+        <div class="step"><b>接口 403 兜底</b>：即使绕过前端手动调接口，后端也会拒绝</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3><span class="dot"></span>权限管理后台</h3>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>对象</th><th>谁可管理</th></tr>
+          <tr><td>系统预置角色</td><td>仅管理员可增删改</td></tr>
+          <tr><td>用户自建角色</td><td>创建者本人 + 管理员可管理</td></tr>
+          <tr><td>放开"创建角色"能力</td><td>管理员在用户 / 用户组上勾选 <code>ai:agent:create</code></td></tr>
+        </table>
+      </div>
+      <p>用户组模型：普通用户组（只能使用）、内容运营组（可创建角色）、管理员组（全部权限）。把 <code>ai:agent:create</code> 挂到组上，按组放权。</p>
+    </div>
+  </section>
+
+  <footer>匿名聊天系统接入 AI 对话 · Java + Spring Boot 架构方案 · 由 Claude 整理生成</footer>
+</main>
+
+</div>
+
+<script>
+  // 自动生成侧边导航目录
+  (function () {
+    var toc = document.getElementById('toc');
+    var sections = document.querySelectorAll('main section');
+    sections.forEach(function (sec) {
+      var title = sec.querySelector('.sec-head h2').textContent;
+      var a = document.createElement('a');
+      a.href = '#' + sec.id;
+      a.innerHTML = '<span class="no">' + sec.id.slice(1) + '</span><span>' + title + '</span>';
+      toc.appendChild(a);
+    });
+
+    // 滚动高亮当前章节
+    var links = Array.prototype.slice.call(toc.querySelectorAll('a'));
+    var map = {};
+    links.forEach(function (l) { map[l.getAttribute('href').slice(1)] = l; });
+
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          links.forEach(function (l) { l.classList.remove('active'); });
+          var el = map[e.target.id];
+          if (el) el.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-15% 0px -75% 0px' });
+
+    sections.forEach(function (sec) { observer.observe(sec); });
+  })();
+</script>
+</body>
+</html>

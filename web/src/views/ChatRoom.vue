@@ -241,6 +241,7 @@ function connect() {
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
     stopRestPolling()
     startHeartbeat()
+    loadHistory()
   }
   ws.onmessage = (event) => {
     try {
@@ -348,7 +349,28 @@ function stopHeartbeat() {
 function switchRoom(roomId) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: 'switch', newRoomId: roomId })); messages.value = []
+    loadHistory()
   } else { currentRoom.value = roomId; connect() }
+}
+
+/** 加载房间历史消息（进入/切换房间时） */
+async function loadHistory() {
+  try {
+    const token = getToken()
+    const res = await fetch(`/api/chat/history?roomId=${currentRoom.value}&limit=50`, {
+      headers: token ? { Authorization: token } : {}
+    })
+    const data = await res.json()
+    if (data.code === 200 && Array.isArray(data.data)) {
+      messages.value = data.data.map(m => ({
+        id: m.id, type: 'chat',
+        nickname: m.nickname || '用户', content: m.content || '',
+        time: m.createtime ? dayjs(m.createtime).format('HH:mm') : '',
+        color: getColor(m.nickname || '用户')
+      }))
+      scrollBottom()
+    }
+  } catch {}
 }
 
 function sendMsg() {

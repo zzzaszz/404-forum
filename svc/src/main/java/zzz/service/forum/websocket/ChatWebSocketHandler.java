@@ -8,13 +8,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import zzz.service.forum.context.UserContext;
+import zzz.service.forum.domain.RoomMessageEntity;
 import zzz.service.forum.domain.User;
+import zzz.service.forum.mapper.RoomMessageMapper;
 import zzz.service.forum.mapper.UserMapper;
 import zzz.service.forum.utils.JwtUtils;
+import zzz.service.forum.utils.SnowflakeIdGenerator;
 
 import javax.annotation.Resource;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +34,10 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private ChatRoomManager roomManager;
     @Resource
     private UserMapper userMapper;
+    @Resource
+    private RoomMessageMapper roomMessageMapper;
+    @Resource
+    private SnowflakeIdGenerator snowflakeIdGenerator;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -107,6 +115,21 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
                 int online = roomManager.getRoomOnlineCount(roomId);
                 broadcast(roomId, new ChatMessage("chat", nickname, content, roomId, online));
+
+                // 聊天消息落库（持久化，供历史记录）
+                try {
+                    RoomMessageEntity msg = new RoomMessageEntity();
+                    msg.setId(snowflakeIdGenerator.nextId());
+                    msg.setRoomid(roomId);
+                    Object uid = session.getAttributes().get("userId");
+                    msg.setUserid(uid instanceof Long ? (Long) uid : null);
+                    msg.setNickname(nickname);
+                    msg.setContent(content);
+                    msg.setCreatetime(new Date());
+                    roomMessageMapper.insert(msg);
+                } catch (Exception e) {
+                    log.warn("聊天消息持久化失败: {}", e.getMessage());
+                }
             } else if ("switch".equals(type)) {
                 // 切换房间
                 Integer newRoomId = json.getInteger("newRoomId");

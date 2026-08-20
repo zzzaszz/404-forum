@@ -238,6 +238,55 @@ export function getFollowers() {
   return request({url: '/chat/followers', method: 'get'})
 }
 
+// ============ AI 对话（/ai/chat，前端经 /api 代理转发） ============
+
+/** 创建 AI 会话 */
+export function aiCreateConversation(data) {
+  return request({url: '/ai/chat/create', method: 'post', data})
+}
+
+/** 我的 AI 会话列表 */
+export function aiConversations() {
+  return request({url: '/ai/chat/conversations', method: 'get'})
+}
+
+/** 关闭 AI 会话 */
+export function aiCloseConversation(data) {
+  return request({url: '/ai/chat/close', method: 'post', data})
+}
+
+/** 发送消息（一次性返回） */
+export function aiSend(data) {
+  return request({url: '/ai/chat/send', method: 'post', data})
+}
+
+/** 会话历史 */
+export function aiHistory(conversationId) {
+  return request({url: '/ai/chat/history', method: 'get', params: {conversationId}})
+}
+
+// ============ AI 角色（/ai/agent，前端经 /api 代理转发） ============
+
+/** 角色列表（系统角色 + 我的角色） */
+export function aiAgentList() {
+  return request({url: '/ai/agent/list', method: 'get'})
+}
+
+/** 创建角色 */
+export function aiAgentCreate(data) {
+  return request({url: '/ai/agent/create', method: 'post', data})
+}
+
+/** 编辑角色 */
+export function aiAgentUpdate(data) {
+  return request({url: '/ai/agent/update', method: 'post', data})
+}
+
+/** 删除角色 */
+export function aiAgentDelete(id) {
+  return request({url: `/ai/agent/${id}`, method: 'delete'})
+}
+
 /** 搜索话题 */
 export function searchTopics(params = {}) {
   return request({url: '/forum/search', method: 'get', params})
